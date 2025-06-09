@@ -4,147 +4,203 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Brain, LogIn } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Brain, LogIn, UserPlus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
+  const [signUpEmail, setSignUpEmail] = useState("");
+  const [signUpPassword, setSignUpPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [userRole, setUserRole] = useState<'admin' | 'candidate'>('candidate');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { signIn, signUp, user, userRole: currentUserRole } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user && currentUserRole) {
+      if (currentUserRole === 'admin') {
+        navigate("/admin-dashboard");
+      } else {
+        navigate("/candidate-dashboard");
+      }
+    }
+  }, [user, currentUserRole, navigate]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate login process - replace with actual Supabase auth
-    setTimeout(() => {
-      if (email && password) {
-        // Mock role detection - replace with actual user role from database
-        const isAdmin = email.includes("admin") || email.includes("@company");
-        
-        toast({
-          title: "Login Successful",
-          description: `Welcome back! Redirecting to ${isAdmin ? "admin" : "candidate"} dashboard...`,
-        });
+    const { error } = await signIn(signInEmail, signInPassword);
+    
+    if (!error) {
+      // Navigation will be handled by useEffect
+    }
+    
+    setIsLoading(false);
+  };
 
-        // Redirect based on user role
-        setTimeout(() => {
-          if (isAdmin) {
-            navigate("/admin-dashboard");
-          } else {
-            navigate("/candidate-dashboard");
-          }
-        }, 1000);
-      } else {
-        toast({
-          title: "Login Failed",
-          description: "Please enter valid credentials",
-          variant: "destructive",
-        });
-      }
-      setIsLoading(false);
-    }, 1500);
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const { error } = await signUp(signUpEmail, signUpPassword, fullName, userRole);
+    
+    setIsLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-cyan-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-2 mb-6">
-            <Brain className="h-8 w-8 text-blue-600" />
+            <Brain className="h-8 w-8 text-cyan-600" />
             <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your account to continue</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome</h1>
+          <p className="text-gray-600">Sign in to your account or create a new one</p>
         </div>
 
-        {/* Login Card */}
-        <Card className="border-0 shadow-xl">
+        {/* Auth Card */}
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-xl text-center">Sign In</CardTitle>
+            <CardTitle className="text-xl text-center">Authentication</CardTitle>
             <CardDescription className="text-center">
-              Enter your credentials to access your dashboard
+              Choose your authentication method
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-sm">
-                  <a href="#" className="text-blue-600 hover:text-blue-800">
-                    Forgot password?
-                  </a>
-                </div>
-              </div>
-              <Button
-                type="submit"
-                className="w-full h-11 bg-blue-600 hover:bg-blue-700"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  "Signing in..."
-                ) : (
-                  <>
-                    <LogIn className="w-4 h-4 mr-2" />
-                    Sign In
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Demo Credentials */}
-        <Card className="mt-6 border-dashed border-2 border-gray-300">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-gray-600">Demo Credentials</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-2 text-sm">
-              <div>
-                <strong>Admin:</strong> admin@company.com / admin123
-              </div>
-              <div>
-                <strong>Candidate:</strong> candidate@test.com / test123
-              </div>
-            </div>
+            <Tabs defaultValue="signin" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="signin" className="space-y-4">
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email">Email</Label>
+                    <Input
+                      id="signin-email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={signInEmail}
+                      onChange={(e) => setSignInEmail(e.target.value)}
+                      required
+                      className="h-11 border-cyan-200 focus:border-cyan-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password">Password</Label>
+                    <Input
+                      id="signin-password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={signInPassword}
+                      onChange={(e) => setSignInPassword(e.target.value)}
+                      required
+                      className="h-11 border-cyan-200 focus:border-cyan-500"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full h-11 bg-cyan-600 hover:bg-cyan-700"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      "Signing in..."
+                    ) : (
+                      <>
+                        <LogIn className="w-4 h-4 mr-2" />
+                        Sign In
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="signup" className="space-y-4">
+                <form onSubmit={handleSignUp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullname">Full Name</Label>
+                    <Input
+                      id="fullname"
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      className="h-11 border-cyan-200 focus:border-cyan-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={signUpEmail}
+                      onChange={(e) => setSignUpEmail(e.target.value)}
+                      required
+                      className="h-11 border-cyan-200 focus:border-cyan-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <Input
+                      id="signup-password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={signUpPassword}
+                      onChange={(e) => setSignUpPassword(e.target.value)}
+                      required
+                      className="h-11 border-cyan-200 focus:border-cyan-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Role</Label>
+                    <Select value={userRole} onValueChange={(value: 'admin' | 'candidate') => setUserRole(value)}>
+                      <SelectTrigger className="h-11 border-cyan-200">
+                        <SelectValue placeholder="Select your role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="candidate">Candidate</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full h-11 bg-cyan-600 hover:bg-cyan-700"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      "Creating account..."
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Create Account
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
         {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
-            <a href="#" className="text-blue-600 hover:text-blue-800 font-medium">
-              Contact Administrator
-            </a>
+            <Link to="/" className="text-cyan-600 hover:text-cyan-800 font-medium">
+              ← Back to Home
+            </Link>
           </p>
         </div>
       </div>

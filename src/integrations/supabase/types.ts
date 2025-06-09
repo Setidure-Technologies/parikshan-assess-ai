@@ -9,7 +9,396 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      answers: {
+        Row: {
+          answer_data: Json
+          candidate_id: string
+          id: string
+          question_id: string
+          section_id: string
+          submitted_at: string | null
+          time_taken_seconds: number | null
+        }
+        Insert: {
+          answer_data: Json
+          candidate_id: string
+          id?: string
+          question_id: string
+          section_id: string
+          submitted_at?: string | null
+          time_taken_seconds?: number | null
+        }
+        Update: {
+          answer_data?: Json
+          candidate_id?: string
+          id?: string
+          question_id?: string
+          section_id?: string
+          submitted_at?: string | null
+          time_taken_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answers_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answers_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidates: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          credentials_sent: boolean | null
+          email: string
+          full_name: string
+          id: string
+          phone: string | null
+          profile_data: Json | null
+          test_status: Database["public"]["Enums"]["test_status"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          credentials_sent?: boolean | null
+          email: string
+          full_name: string
+          id?: string
+          phone?: string | null
+          profile_data?: Json | null
+          test_status?: Database["public"]["Enums"]["test_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          credentials_sent?: boolean | null
+          email?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          profile_data?: Json | null
+          test_status?: Database["public"]["Enums"]["test_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          industry: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          industry: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          industry?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          profile_data: Json | null
+          updated_at: string | null
+          user_role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          email: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          profile_data?: Json | null
+          updated_at?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          profile_data?: Json | null
+          updated_at?: string | null
+          user_role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_templates: {
+        Row: {
+          correct_answer: string | null
+          created_at: string | null
+          difficulty_level:
+            | Database["public"]["Enums"]["difficulty_level"]
+            | null
+          id: string
+          industry_context: string | null
+          metadata: Json | null
+          options: Json | null
+          question_number: number
+          question_text: string
+          question_type: Database["public"]["Enums"]["question_type"]
+          relevance_tag: string | null
+          scale_dimension: string
+          scoring_logic: Json | null
+          section_id: string | null
+          time_to_answer_seconds: number | null
+        }
+        Insert: {
+          correct_answer?: string | null
+          created_at?: string | null
+          difficulty_level?:
+            | Database["public"]["Enums"]["difficulty_level"]
+            | null
+          id?: string
+          industry_context?: string | null
+          metadata?: Json | null
+          options?: Json | null
+          question_number: number
+          question_text: string
+          question_type: Database["public"]["Enums"]["question_type"]
+          relevance_tag?: string | null
+          scale_dimension: string
+          scoring_logic?: Json | null
+          section_id?: string | null
+          time_to_answer_seconds?: number | null
+        }
+        Update: {
+          correct_answer?: string | null
+          created_at?: string | null
+          difficulty_level?:
+            | Database["public"]["Enums"]["difficulty_level"]
+            | null
+          id?: string
+          industry_context?: string | null
+          metadata?: Json | null
+          options?: Json | null
+          question_number?: number
+          question_text?: string
+          question_type?: Database["public"]["Enums"]["question_type"]
+          relevance_tag?: string | null
+          scale_dimension?: string
+          scoring_logic?: Json | null
+          section_id?: string | null
+          time_to_answer_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_templates_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      questions: {
+        Row: {
+          candidate_id: string
+          company_id: string
+          created_at: string | null
+          created_by_flow: boolean | null
+          id: string
+          metadata: Json | null
+          options: Json | null
+          question_number: number
+          question_text: string
+          question_type: Database["public"]["Enums"]["question_type"]
+          section_id: string
+          template_id: string | null
+          time_limit_seconds: number | null
+        }
+        Insert: {
+          candidate_id: string
+          company_id: string
+          created_at?: string | null
+          created_by_flow?: boolean | null
+          id?: string
+          metadata?: Json | null
+          options?: Json | null
+          question_number: number
+          question_text: string
+          question_type: Database["public"]["Enums"]["question_type"]
+          section_id: string
+          template_id?: string | null
+          time_limit_seconds?: number | null
+        }
+        Update: {
+          candidate_id?: string
+          company_id?: string
+          created_at?: string | null
+          created_by_flow?: boolean | null
+          id?: string
+          metadata?: Json | null
+          options?: Json | null
+          question_number?: number
+          question_text?: string
+          question_type?: Database["public"]["Enums"]["question_type"]
+          section_id?: string
+          template_id?: string | null
+          time_limit_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "question_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sections: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          name: string
+          time_limit_minutes: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          name: string
+          time_limit_minutes?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          name?: string
+          time_limit_minutes?: number | null
+        }
+        Relationships: []
+      }
+      test_sessions: {
+        Row: {
+          candidate_id: string
+          completed_at: string | null
+          id: string
+          section_id: string
+          started_at: string | null
+          status: string | null
+          total_time_seconds: number | null
+        }
+        Insert: {
+          candidate_id: string
+          completed_at?: string | null
+          id?: string
+          section_id: string
+          started_at?: string | null
+          status?: string | null
+          total_time_seconds?: number | null
+        }
+        Update: {
+          candidate_id?: string
+          completed_at?: string | null
+          id?: string
+          section_id?: string
+          started_at?: string | null
+          status?: string | null
+          total_time_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_sessions_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_sessions_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +407,19 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      difficulty_level: "easy" | "moderate" | "hard"
+      question_type:
+        | "forced_choice"
+        | "sjt"
+        | "likert_scale"
+        | "true_false"
+        | "open_ended"
+      test_status:
+        | "pending"
+        | "questions_generated"
+        | "in_progress"
+        | "completed"
+      user_role: "admin" | "candidate"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +534,22 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      difficulty_level: ["easy", "moderate", "hard"],
+      question_type: [
+        "forced_choice",
+        "sjt",
+        "likert_scale",
+        "true_false",
+        "open_ended",
+      ],
+      test_status: [
+        "pending",
+        "questions_generated",
+        "in_progress",
+        "completed",
+      ],
+      user_role: ["admin", "candidate"],
+    },
   },
 } as const
