@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,12 +81,12 @@ const TestSection = () => {
           .order('question_number');
 
         if (questionsData && questionsData.length > 0) {
-          const formattedQuestions = questionsData.map(q => ({
+          const formattedQuestions: Question[] = questionsData.map(q => ({
             id: q.id,
             question_number: q.question_number,
             question_text: q.question_text,
             question_type: q.question_type,
-            options: Array.isArray(q.options) ? q.options : [],
+            options: Array.isArray(q.options) ? q.options.map(option => String(option)) : [],
             time_limit_seconds: q.time_limit_seconds || 60,
             metadata: q.metadata || {}
           }));
