@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -42,15 +43,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Fetch user profile to get role
           setTimeout(async () => {
             try {
-              const { data: profile } = await supabase
+              const { data: profile, error } = await supabase
                 .from('profiles')
                 .select('user_role')
                 .eq('id', session.user.id)
                 .single();
               
-              setUserRole(profile?.user_role || 'candidate');
+              if (error) {
+                console.error('Error fetching user role:', error);
+                setUserRole('candidate'); // default fallback
+              } else {
+                console.log('User role fetched:', profile?.user_role);
+                setUserRole(profile?.user_role || 'candidate');
+              }
             } catch (error) {
               console.error('Error fetching user role:', error);
+              setUserRole('candidate'); // default fallback
             }
           }, 0);
         } else {
@@ -63,6 +71,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -73,6 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (email: string, password: string, fullName: string, userRole: 'admin' | 'candidate') => {
     try {
+      console.log('Attempting to sign up:', email, userRole);
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -86,12 +96,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       if (error) {
+        console.error('Sign up error:', error);
         toast({
           title: "Sign Up Failed",
           description: error.message,
           variant: "destructive",
         });
       } else {
+        console.log('Sign up successful');
         toast({
           title: "Account Created!",
           description: "Please check your email to verify your account.",
@@ -100,33 +112,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       return { error };
     } catch (error: any) {
+      console.error('Sign up exception:', error);
       return { error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Attempting to sign in:', email);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
       if (error) {
+        console.error('Sign in error:', error);
         toast({
           title: "Login Failed",
           description: error.message,
           variant: "destructive",
         });
+      } else {
+        console.log('Sign in successful');
       }
       
       return { error };
     } catch (error: any) {
+      console.error('Sign in exception:', error);
       return { error };
     }
   };
 
   const signOut = async () => {
     try {
+      console.log('Attempting to sign out');
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
