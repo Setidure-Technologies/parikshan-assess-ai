@@ -147,8 +147,8 @@ export type Database = {
           id: string
           phone: string | null
           profile_data: Json | null
+          role_id: string
           updated_at: string | null
-          user_role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
           company_id?: string | null
@@ -158,8 +158,8 @@ export type Database = {
           id: string
           phone?: string | null
           profile_data?: Json | null
+          role_id: string
           updated_at?: string | null
-          user_role?: Database["public"]["Enums"]["user_role"]
         }
         Update: {
           company_id?: string | null
@@ -169,8 +169,8 @@ export type Database = {
           id?: string
           phone?: string | null
           profile_data?: Json | null
+          role_id?: string
           updated_at?: string | null
-          user_role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: [
           {
@@ -178,6 +178,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
             referencedColumns: ["id"]
           },
         ]
@@ -326,6 +333,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      roles: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       sections: {
         Row: {

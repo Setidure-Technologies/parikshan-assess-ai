@@ -31,6 +31,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  const fetchUserRole = async (userId: string) => {
+    try {
+      console.log('Fetching user role for user:', userId);
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select(`
+          role_id,
+          roles!inner(name)
+        `)
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching user role:', error);
+        setUserRole('candidate'); // default fallback
+        return;
+      }
+      
+      const roleName = profile?.roles?.name || 'candidate';
+      console.log('User role fetched:', roleName);
+      setUserRole(roleName);
+    } catch (error) {
+      console.error('Exception fetching user role:', error);
+      setUserRole('candidate'); // default fallback
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -40,26 +67,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user profile to get role
-          setTimeout(async () => {
-            try {
-              const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('user_role')
-                .eq('id', session.user.id)
-                .single();
-              
-              if (error) {
-                console.error('Error fetching user role:', error);
-                setUserRole('candidate'); // default fallback
-              } else {
-                console.log('User role fetched:', profile?.user_role);
-                setUserRole(profile?.user_role || 'candidate');
-              }
-            } catch (error) {
-              console.error('Error fetching user role:', error);
-              setUserRole('candidate'); // default fallback
-            }
+          // Defer role fetching to prevent deadlocks
+          setTimeout(() => {
+            fetchUserRole(session.user.id);
           }, 0);
         } else {
           setUserRole(null);
@@ -74,6 +84,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserRole(session.user.id);
+      }
+      
       setLoading(false);
     });
 
@@ -83,6 +98,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUp = async (email: string, password: string, fullName: string, userRole: 'admin' | 'candidate') => {
     try {
       console.log('Attempting to sign up:', email, userRole);
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
