@@ -1,70 +1,84 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Brain, Upload, Users, Building, FileText, LogOut } from "lucide-react";
+import { Brain, Users, Building, FileText, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import CsvUploadForm from "@/components/CsvUploadForm";
+
+interface CompanyData {
+  id: string;
+  name: string;
+  industry: string;
+  email: string;
+}
+
+interface CandidateData {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  test_status: string;
+  company_id: string;
+}
 
 const AdminDashboard = () => {
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { toast } = useToast();
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+  const [candidatesData, setCandidatesData] = useState<CandidateData[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - replace with actual Supabase queries
-  const companyData = {
-    name: "TechCorp Solutions",
-    industry: "Information Technology",
-    email: "admin@techcorp.com"
-  };
+  useEffect(() => {
+    if (user) {
+      fetchAdminData();
+    }
+  }, [user]);
 
-  const candidatesData = [
-    { id: 1, name: "John Doe", email: "john@test.com", phone: "+1234567890", status: "Questions Generated" },
-    { id: 2, name: "Jane Smith", email: "jane@test.com", phone: "+1234567891", status: "Test Completed" },
-    { id: 3, name: "Mike Johnson", email: "mike@test.com", phone: "+1234567892", status: "Pending" },
-    { id: 4, name: "Sarah Wilson", email: "sarah@test.com", phone: "+1234567893", status: "Questions Generated" },
-  ];
+  const fetchAdminData = async () => {
+    try {
+      // Fetch user's company information
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select(`
+          company_id,
+          companies!inner(
+            id,
+            name,
+            industry,
+            email
+          )
+        `)
+        .eq('id', user?.id)
+        .single();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type === "text/csv") {
-      setCsvFile(file);
-    } else {
+      if (profile?.companies) {
+        setCompanyData(profile.companies);
+        
+        // Fetch candidates for this company
+        const { data: candidates } = await supabase
+          .from('candidates')
+          .select('*')
+          .eq('company_id', profile.companies.id)
+          .order('created_at', { ascending: false });
+
+        setCandidatesData(candidates || []);
+      }
+    } catch (error) {
+      console.error('Error fetching admin data:', error);
       toast({
-        title: "Invalid File",
-        description: "Please select a valid CSV file",
+        title: "Error",
+        description: "Failed to load dashboard data",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!csvFile) {
-      toast({
-        title: "No File Selected",
-        description: "Please select a CSV file to upload",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsUploading(true);
-    
-    // Simulate upload process - replace with actual CSV processing
-    setTimeout(() => {
-      toast({
-        title: "Upload Successful",
-        description: "Candidates uploaded successfully. Credentials are being generated...",
-      });
-      setCsvFile(null);
-      setIsUploading(false);
-    }, 2000);
   };
 
   const handleLogout = async () => {
@@ -73,16 +87,26 @@ const AdminDashboard = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Pending":
+      case "pending":
         return <Badge variant="secondary">{status}</Badge>;
-      case "Questions Generated":
-        return <Badge variant="default" className="bg-blue-600">{status}</Badge>;
-      case "Test Completed":
-        return <Badge variant="default" className="bg-green-600">{status}</Badge>;
+      case "questions_generated":
+        return <Badge variant="default" className="bg-blue-600">Questions Generated</Badge>;
+      case "in_progress":
+        return <Badge variant="default" className="bg-yellow-600">In Progress</Badge>;
+      case "completed":
+        return <Badge variant="default" className="bg-green-600">Completed</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -119,20 +143,24 @@ const AdminDashboard = () => {
               <Building className="h-4 w-4 ml-auto text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-sm text-gray-600">Company Name</p>
-                  <p className="font-medium">{companyData.name}</p>
+              {companyData ? (
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm text-gray-600">Company Name</p>
+                    <p className="font-medium">{companyData.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Industry</p>
+                    <p className="font-medium">{companyData.industry}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Email</p>
+                    <p className="font-medium">{companyData.email}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Industry</p>
-                  <p className="font-medium">{companyData.industry}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Email</p>
-                  <p className="font-medium">{companyData.email}</p>
-                </div>
-              </div>
+              ) : (
+                <p className="text-sm text-gray-500">No company data available</p>
+              )}
             </CardContent>
           </Card>
 
@@ -145,7 +173,7 @@ const AdminDashboard = () => {
             <CardContent>
               <div className="text-2xl font-bold">{candidatesData.length}</div>
               <p className="text-xs text-muted-foreground">
-                +2 from last week
+                Registered candidates
               </p>
             </CardContent>
           </Card>
@@ -157,10 +185,12 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {candidatesData.filter(c => c.status === "Test Completed").length}
+                {candidatesData.filter(c => c.test_status === "completed").length}
               </div>
               <p className="text-xs text-muted-foreground">
-                {Math.round((candidatesData.filter(c => c.status === "Test Completed").length / candidatesData.length) * 100)}% completion rate
+                {candidatesData.length > 0 
+                  ? Math.round((candidatesData.filter(c => c.test_status === "completed").length / candidatesData.length) * 100)
+                  : 0}% completion rate
               </p>
             </CardContent>
           </Card>
@@ -168,48 +198,7 @@ const AdminDashboard = () => {
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* CSV Upload Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload Candidates</CardTitle>
-              <CardDescription>
-                Upload a CSV file with candidate information to automatically generate accounts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleUpload} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="csv-file">CSV File</Label>
-                  <Input
-                    id="csv-file"
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileChange}
-                    className="cursor-pointer"
-                  />
-                  <p className="text-sm text-gray-500">
-                    CSV should include: full_name, email, phone columns
-                  </p>
-                </div>
-                {csvFile && (
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      Selected: {csvFile.name} ({(csvFile.size / 1024).toFixed(1)} KB)
-                    </p>
-                  </div>
-                )}
-                <Button type="submit" disabled={isUploading || !csvFile} className="w-full">
-                  {isUploading ? (
-                    "Uploading..."
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload Candidates
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+          <CsvUploadForm />
 
           {/* Candidate List */}
           <Card>
@@ -221,32 +210,43 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {candidatesData.slice(0, 4).map((candidate) => (
-                      <TableRow key={candidate.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{candidate.name}</p>
-                            <p className="text-sm text-gray-500">{candidate.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(candidate.status)}
-                        </TableCell>
+                {candidatesData.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <Button variant="outline" className="w-full">
-                  View All Candidates
-                </Button>
+                    </TableHeader>
+                    <TableBody>
+                      {candidatesData.slice(0, 6).map((candidate) => (
+                        <TableRow key={candidate.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{candidate.full_name}</p>
+                              <p className="text-sm text-gray-500">{candidate.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(candidate.test_status)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No candidates yet</h3>
+                    <p className="text-gray-500">Upload a CSV file to add candidates</p>
+                  </div>
+                )}
+                
+                {candidatesData.length > 6 && (
+                  <Button variant="outline" className="w-full">
+                    View All {candidatesData.length} Candidates
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
