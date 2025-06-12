@@ -128,7 +128,7 @@ const CsvUploadForm = () => {
   const sendToN8nWebhook = async (csvData: CsvRow[], companyId: string) => {
     const webhookUrl = process.env.VITE_N8N_WEBHOOK_URL || 'YOUR_N8N_WEBHOOK_URL_HERE';
     
-    if (!webhookUrl || webhookUrl === 'YOUR_N8N_WEBHOOK_URL_HERE') {
+    if (!webhookUrl || webhookUrl === 'https://n8n.erudites.in/webhook-test/476f1370-870d-459e-8be0-8ab3d86ff69a') {
       throw new Error('N8N webhook URL is not configured');
     }
 
