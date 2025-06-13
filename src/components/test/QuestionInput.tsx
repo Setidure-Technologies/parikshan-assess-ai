@@ -8,7 +8,7 @@ interface Question {
   id: string;
   question_number: number;
   question_text: string;
-  question_type: 'forced_choice' | 'sjt' | 'likert_scale' | 'true_false' | 'open_ended';
+  question_type: 'forced_choice' | 'sjt' | 'likert_scale' | 'true_false' | 'open_ended' | 'mcq';
   options: string[];
   time_limit_seconds: number;
   metadata: any;
@@ -22,6 +22,7 @@ interface QuestionInputProps {
 
 export const QuestionInput = ({ question, answer, onAnswerChange }: QuestionInputProps) => {
   switch (question.question_type) {
+    case 'mcq':
     case 'likert_scale':
     case 'forced_choice':
     case 'sjt':

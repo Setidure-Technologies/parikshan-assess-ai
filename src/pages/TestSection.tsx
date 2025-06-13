@@ -19,7 +19,7 @@ interface Question {
   id: string;
   question_number: number;
   question_text: string;
-  question_type: 'forced_choice' | 'sjt' | 'likert_scale' | 'true_false' | 'open_ended';
+  question_type: 'forced_choice' | 'sjt' | 'likert_scale' | 'true_false' | 'open_ended' | 'mcq';
   options: string[];
   time_limit_seconds: number;
   metadata: any;
@@ -152,7 +152,12 @@ const TestSection = () => {
             answersData.forEach(answer => {
               const questionIndex = formattedQuestions.findIndex(q => q.id === answer.question_id);
               if (questionIndex !== -1) {
-                answersMap[questionIndex] = answer.answer_data.value;
+                // Handle different answer_data structures
+                let answerValue = answer.answer_data;
+                if (typeof answerValue === 'object' && answerValue !== null && 'value' in answerValue) {
+                  answerValue = (answerValue as any).value;
+                }
+                answersMap[questionIndex] = answerValue;
               }
             });
             
@@ -291,6 +296,41 @@ const TestSection = () => {
       navigate("/candidate-dashboard");
     }, 1500);
   };
+
+  // Question timer
+  useEffect(() => {
+    if (questionTimeRemaining <= 0) return;
+    
+    const timer = setInterval(() => {
+      setQuestionTimeRemaining(prev => {
+        if (prev <= 1) {
+          // Auto-move to next question when time runs out
+          if (currentQuestion < questions.length - 1) {
+            handleNext();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [questionTimeRemaining, currentQuestion, questions.length]);
+
+  // Total timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTotalTimeRemaining((prev) => {
+        if (prev <= 1) {
+          handleAutoSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   if (loading) {
     return (
