@@ -46,41 +46,83 @@ const TestSection = () => {
       if (!user) return;
       
       try {
+        console.log('Loading questions for section:', sectionId);
+        
         // Get candidate record
-        const { data: candidate } = await supabase
+        const { data: candidate, error: candidateError } = await supabase
           .from('candidates')
           .select('id')
           .eq('user_id', user.id)
           .single();
 
-        if (!candidate) {
+        if (candidateError) {
+          console.error('Error fetching candidate:', candidateError);
           toast({
             title: "Error",
             description: "Candidate record not found",
             variant: "destructive",
           });
+          setLoading(false);
           return;
         }
 
+        if (!candidate) {
+          console.error('No candidate found for user:', user.id);
+          toast({
+            title: "Error",
+            description: "Candidate record not found",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        console.log('Found candidate ID:', candidate.id);
+
         // Get section info
-        const { data: section } = await supabase
+        const { data: section, error: sectionError } = await supabase
           .from('sections')
           .select('name, time_limit_minutes')
           .eq('id', sectionId)
           .single();
 
+        if (sectionError) {
+          console.error('Error fetching section:', sectionError);
+          toast({
+            title: "Error",
+            description: "Section not found",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         if (section) {
+          console.log('Found section:', section.name);
           setSectionName(section.name);
           setTotalTimeRemaining(section.time_limit_minutes * 60);
         }
 
         // Get questions for this section and candidate
-        const { data: questionsData } = await supabase
+        const { data: questionsData, error: questionsError } = await supabase
           .from('questions')
           .select('*')
           .eq('section_id', sectionId)
           .eq('candidate_id', candidate.id)
           .order('question_number');
+
+        if (questionsError) {
+          console.error('Error fetching questions:', questionsError);
+          toast({
+            title: "Error",
+            description: "Failed to load questions",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        console.log('Found questions:', questionsData?.length || 0);
 
         if (questionsData && questionsData.length > 0) {
           const formattedQuestions: Question[] = questionsData.map(q => ({
@@ -95,6 +137,29 @@ const TestSection = () => {
           
           setQuestions(formattedQuestions);
           setQuestionTimeRemaining(formattedQuestions[0]?.time_limit_seconds || 60);
+          
+          // Load existing answers
+          const { data: answersData, error: answersError } = await supabase
+            .from('answers')
+            .select('*')
+            .eq('section_id', sectionId)
+            .eq('candidate_id', candidate.id);
+            
+          if (!answersError && answersData && answersData.length > 0) {
+            console.log('Found existing answers:', answersData.length);
+            const answersMap: { [key: number]: any } = {};
+            
+            answersData.forEach(answer => {
+              const questionIndex = formattedQuestions.findIndex(q => q.id === answer.question_id);
+              if (questionIndex !== -1) {
+                answersMap[questionIndex] = answer.answer_data.value;
+              }
+            });
+            
+            setAnswers(answersMap);
+          }
+        } else {
+          console.log('No questions found for this section and candidate');
         }
       } catch (error) {
         console.error('Error loading questions:', error);

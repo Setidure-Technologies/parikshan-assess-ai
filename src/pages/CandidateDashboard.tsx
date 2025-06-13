@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,73 +7,205 @@ import { Progress } from "@/components/ui/progress";
 import { Brain, User, FileText, Mic, MessageSquare, Clock, LogOut, Play } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+
+interface Section {
+  id: string;
+  name: string;
+  description: string;
+  icon: any;
+  duration: string;
+  questions: number;
+  completed: boolean;
+  available: boolean;
+  time_limit_minutes: number;
+}
+
+interface CandidateData {
+  full_name: string;
+  email: string;
+  phone: string;
+  company: string;
+}
 
 const CandidateDashboard = () => {
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
+  const [candidateData, setCandidateData] = useState<CandidateData>({
+    full_name: "",
+    email: "",
+    phone: "",
+    company: ""
+  });
+  const [testSections, setTestSections] = useState<Section[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Mock data - replace with actual Supabase queries
-  const candidateData = {
-    full_name: "John Doe",
-    email: "john@test.com",
-    phone: "+1234567890",
-    company: "TechCorp Solutions"
+  // Map section names to icons
+  const sectionIcons: { [key: string]: any } = {
+    'Psychometric Assessment': Brain,
+    'Language Skills': FileText,
+    'Situational Judgment': MessageSquare,
+    'Technical Assessment': Mic
   };
 
-  const testSections = [
-    {
-      id: "psychometric",
-      name: "Psychometric Assessment",
-      description: "Personality and cognitive ability tests",
-      icon: Brain,
-      duration: "30 minutes",
-      questions: 25,
-      completed: false,
-      available: true
-    },
-    {
-      id: "language",
-      name: "Language Skills",
-      description: "English proficiency and communication skills",
-      icon: FileText,
-      duration: "20 minutes",
-      questions: 15,
-      completed: false,
-      available: true
-    },
-    {
-      id: "speech",
-      name: "Speech Assessment",
-      description: "Verbal communication and pronunciation",
-      icon: Mic,
-      duration: "15 minutes",
-      questions: 5,
-      completed: false,
-      available: false // No questions generated yet
-    },
-    {
-      id: "interview",
-      name: "Interview Questions",
-      description: "Technical and behavioral interview questions",
-      icon: MessageSquare,
-      duration: "45 minutes",
-      questions: 10,
-      completed: false,
-      available: true
+  useEffect(() => {
+    if (user) {
+      fetchCandidateData();
+      fetchSections();
     }
-  ];
+  }, [user]);
+
+  const fetchCandidateData = async () => {
+    try {
+      // Get candidate record
+      const { data: candidate, error: candidateError } = await supabase
+        .from('candidates')
+        .select('*, companies(name)')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (candidateError) {
+        console.error('Error fetching candidate data:', candidateError);
+        return;
+      }
+
+      if (candidate) {
+        setCandidateData({
+          full_name: candidate.full_name,
+          email: candidate.email,
+          phone: candidate.phone || '',
+          company: candidate.companies?.name || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error in fetchCandidateData:', error);
+    }
+  };
+
+  const fetchSections = async () => {
+    try {
+      setLoading(true);
+      
+      // Get candidate ID
+      const { data: candidate, error: candidateError } = await supabase
+        .from('candidates')
+        .select('id')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (candidateError) {
+        console.error('Error fetching candidate ID:', candidateError);
+        setLoading(false);
+        return;
+      }
+
+      // Get all sections
+      const { data: sectionsData, error: sectionsError } = await supabase
+        .from('sections')
+        .select('*')
+        .order('display_order');
+
+      if (sectionsError) {
+        console.error('Error fetching sections:', sectionsError);
+        setLoading(false);
+        return;
+      }
+
+      // For each section, check if questions exist for this candidate
+      const sectionsWithAvailability = await Promise.all(sectionsData.map(async (section) => {
+        // Check if questions exist for this section and candidate
+        const { data: questions, error: questionsError } = await supabase
+          .from('questions')
+          .select('id')
+          .eq('section_id', section.id)
+          .eq('candidate_id', candidate?.id);
+
+        if (questionsError) {
+          console.error(`Error checking questions for section ${section.name}:`, questionsError);
+        }
+
+        // Check if answers exist for this section (to determine if completed)
+        const { data: answers, error: answersError } = await supabase
+          .from('answers')
+          .select('id')
+          .eq('section_id', section.id)
+          .eq('candidate_id', candidate?.id);
+
+        if (answersError) {
+          console.error(`Error checking answers for section ${section.name}:`, answersError);
+        }
+
+        const available = questions && questions.length > 0;
+        const completed = answers && answers.length > 0 && answers.length >= (questions?.length || 0);
+
+        return {
+          id: section.id,
+          name: section.name,
+          description: section.description || '',
+          icon: sectionIcons[section.name] || FileText,
+          duration: `${section.time_limit_minutes} minutes`,
+          questions: questions?.length || 0,
+          completed: completed,
+          available: available,
+          time_limit_minutes: section.time_limit_minutes
+        };
+      }));
+
+      setTestSections(sectionsWithAvailability);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error in fetchSections:', error);
+      setLoading(false);
+    }
+  };
 
   const completedSections = testSections.filter(s => s.completed).length;
   const totalSections = testSections.length;
-  const progressPercentage = (completedSections / totalSections) * 100;
+  const progressPercentage = totalSections > 0 ? (completedSections / totalSections) * 100 : 0;
 
-  const handleStartSection = (sectionId: string) => {
+  const handleStartSection = async (sectionId: string) => {
     const section = testSections.find(s => s.id === sectionId);
     if (!section?.available) {
       toast({
         title: "Section Not Available",
         description: "Questions for this section haven't been generated yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get candidate ID
+    const { data: candidate, error: candidateError } = await supabase
+      .from('candidates')
+      .select('id')
+      .eq('user_id', user?.id)
+      .single();
+
+    if (candidateError) {
+      console.error('Error fetching candidate ID:', candidateError);
+      toast({
+        title: "Error",
+        description: "Could not retrieve your candidate information",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Double check that questions exist for this section
+    const { data: questions, error: questionsError } = await supabase
+      .from('questions')
+      .select('id')
+      .eq('section_id', sectionId)
+      .eq('candidate_id', candidate?.id);
+
+    if (questionsError || !questions || questions.length === 0) {
+      console.error('Error checking questions:', questionsError);
+      toast({
+        title: "No Questions Available",
+        description: "There are no questions available for this section yet.",
         variant: "destructive",
       });
       return;
@@ -89,13 +221,34 @@ const CandidateDashboard = () => {
     }, 1000);
   };
 
-  const handleLogout = () => {
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out",
-    });
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out",
+      });
+      navigate("/");
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: "Error",
+        description: "Failed to log out",
+        variant: "destructive",
+      });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-600 mx-auto mb-4"></div>
+          <p className="text-cyan-800 font-medium">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

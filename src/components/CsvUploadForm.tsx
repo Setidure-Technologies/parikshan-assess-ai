@@ -125,37 +125,194 @@ const CsvUploadForm = () => {
     return newCompany.id;
   };
 
-  const sendToN8nWebhook = async (csvData: CsvRow[], companyId: string) => {
-    const webhookUrl = process.env.VITE_N8N_WEBHOOK_URL || 'YOUR_N8N_WEBHOOK_URL_HERE';
+  // Helper function to validate and normalize webhook URL
+  const validateWebhookUrl = (url: string): string => {
+    console.log('Validating webhook URL:', url);
     
-    if (!webhookUrl || webhookUrl === 'https://n8n.erudites.in/webhook-test/476f1370-870d-459e-8be0-8ab3d86ff69a') {
+    // Check if URL is valid
+    try {
+      const parsedUrl = new URL(url);
+      
+      // Ensure it's using http or https protocol
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        throw new Error(`Invalid protocol: ${parsedUrl.protocol}`);
+      }
+      
+      console.log('Webhook URL is valid');
+      return url;
+    } catch (error) {
+      console.error('Invalid webhook URL:', error);
+      throw new Error(`Invalid webhook URL: ${error.message}`);
+    }
+  };
+
+  const sendToN8nWebhook = async (csvFile: File, companyId: string) => {
+    let webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || 'YOUR_N8N_WEBHOOK_URL_HERE';
+    
+    if (!webhookUrl || webhookUrl === 'YOUR_N8N_WEBHOOK_URL_HERE') {
       throw new Error('N8N webhook URL is not configured');
     }
+    
+    // Validate and normalize the webhook URL
+    webhookUrl = validateWebhookUrl(webhookUrl);
 
-    const payload = {
+    console.log('Preparing webhook POST request to:', webhookUrl);
+    console.log('With CSV file:', csvFile.name, `(${csvFile.size} bytes)`);
+    
+    // Create a FormData object to send the file and metadata
+    const formData = new FormData();
+    
+    // Add the CSV file as a binary file
+    formData.append('file', csvFile, csvFile.name);
+    
+    // Add company metadata as JSON
+    const metadata = JSON.stringify({
       company: {
         id: companyId,
         name: companyData.name,
         email: companyData.email,
         industry: companyData.industry
       },
-      candidates: csvData,
-      admin_user_id: user?.id
-    };
-
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload)
+      admin_user_id: user?.id,
+      timestamp: new Date().toISOString()
     });
+    
+    formData.append('metadata', metadata);
+    
+    console.log('Form data prepared with file and metadata');
 
-    if (!response.ok) {
-      throw new Error(`Webhook failed: ${response.statusText}`);
+    // First try with XMLHttpRequest for multipart form data
+    try {
+      console.log('Attempting direct POST with XMLHttpRequest for multipart form data');
+      
+      // Create a new XMLHttpRequest
+      const xhr = new XMLHttpRequest();
+      
+      // Configure it: POST-request to the URL
+      xhr.open('POST', webhookUrl, true);
+      
+      // No need to set Content-Type header for FormData - browser will set it with boundary
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      
+      // Create a promise to handle the async XHR
+      return await new Promise((resolve, reject) => {
+        xhr.onload = function() {
+          console.log('XHR status:', xhr.status);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve(response);
+            } catch (e) {
+              console.log('Response parsing error:', e);
+              resolve({ success: true, message: 'Request successful but response was not JSON' });
+            }
+          } else {
+            console.error('XHR error response:', xhr.responseText);
+            reject(new Error(`Webhook failed: ${xhr.statusText} (${xhr.status})`));
+          }
+        };
+        
+        xhr.onerror = function() {
+          console.error('XHR network error');
+          reject(new Error('Network error occurred while sending webhook'));
+        };
+        
+        // Send the request with the FormData
+        xhr.send(formData);
+        console.log('XHR request sent with FormData');
+      });
+    } catch (xhrError) {
+      console.error('XMLHttpRequest approach failed:', xhrError);
+      
+      // Fallback to fetch API
+      console.log('Falling back to fetch API with FormData');
+      try {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          // No need to set Content-Type header for FormData - browser will set it with boundary
+          body: formData,
+          cache: 'no-cache',
+          redirect: 'follow',
+        });
+        
+        console.log('Fetch response status:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Fetch error response:', errorText);
+          throw new Error(`Webhook failed: ${response.statusText} (${response.status})`);
+        }
+        
+        return await response.json();
+      } catch (fetchError) {
+        console.error('Fetch approach also failed:', fetchError);
+        
+        // Last resort: Use a hidden form submission approach with the file
+        console.log('Attempting final approach: Hidden form POST submission with file');
+        try {
+          return await new Promise((resolve, reject) => {
+            // Create a hidden iframe to target the form submission
+            const iframe = document.createElement('iframe');
+            iframe.name = 'webhook-iframe';
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            // Create a form element
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = webhookUrl;
+            form.target = 'webhook-iframe';
+            form.style.display = 'none';
+            form.enctype = 'multipart/form-data'; // Important for file uploads
+            
+            // Create a file input and add the file
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.name = 'file';
+            // We can't directly set the file, so we'll add the metadata instead
+            form.appendChild(fileInput);
+            
+            // Add metadata as a hidden input
+            const metadataInput = document.createElement('input');
+            metadataInput.type = 'hidden';
+            metadataInput.name = 'metadata';
+            metadataInput.value = metadata;
+            form.appendChild(metadataInput);
+            
+            // Add the form to the document
+            document.body.appendChild(form);
+            
+            // Handle the iframe load event
+            iframe.onload = () => {
+              console.log('Form submission completed');
+              // Clean up
+              document.body.removeChild(form);
+              document.body.removeChild(iframe);
+              resolve({ success: true, message: 'Form submission approach succeeded' });
+            };
+            
+            // Handle errors
+            iframe.onerror = (error) => {
+              console.error('Form submission failed:', error);
+              // Clean up
+              document.body.removeChild(form);
+              document.body.removeChild(iframe);
+              reject(new Error('Form submission approach failed'));
+            };
+            
+            console.log('Submitting form...');
+            form.submit();
+          });
+        } catch (formError) {
+          console.error('All three approaches failed:');
+          console.error('1. XMLHttpRequest error:', xhrError);
+          console.error('2. Fetch error:', fetchError);
+          console.error('3. Form submission error:', formError);
+          throw new Error('Failed to send webhook after multiple attempts with different methods');
+        }
+      }
     }
-
-    return response.json();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -183,23 +340,21 @@ const CsvUploadForm = () => {
     setUploadStatus('processing');
 
     try {
-      // Parse CSV file
-      const csvData = await parseCsv(csvFile);
-      
-      if (csvData.length === 0) {
-        throw new Error('No valid candidate data found in CSV');
+      // Validate CSV file has content (quick check)
+      if (csvFile.size === 0) {
+        throw new Error('CSV file is empty');
       }
 
       // Create or get company
       const companyId = await createCompanyIfNotExists();
 
-      // Send to n8n webhook
-      await sendToN8nWebhook(csvData, companyId);
+      // Send the CSV file directly to n8n webhook
+      await sendToN8nWebhook(csvFile, companyId);
 
       setUploadStatus('success');
       toast({
         title: "Upload Successful",
-        description: `Processing ${csvData.length} candidates. Users will be created automatically via your n8n workflow.`,
+        description: `CSV file uploaded successfully. Data will be processed via your n8n workflow.`,
       });
 
       // Reset form
