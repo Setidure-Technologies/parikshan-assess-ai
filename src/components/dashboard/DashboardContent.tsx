@@ -2,86 +2,26 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
+import { useCompany } from "@/hooks/useCompany";
+import { useCandidates } from "@/hooks/useCandidates";
 import CompanyDetailsCard from "./CompanyDetailsCard";
 import StatsCards from "./StatsCards";
 import CandidatesList from "./CandidatesList";
 import CsvUploadForm from "@/components/CsvUploadForm";
 
-interface CompanyData {
-  id: string;
-  name: string;
-  industry: string;
-  email: string;
-}
-
-interface CandidateData {
-  id: string;
-  full_name: string;
-  email: string;
-  phone?: string;
-  test_status: string;
-  company_id: string;
-}
-
 const DashboardContent = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
-  const [candidatesData, setCandidatesData] = useState<CandidateData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { profile, loading: profileLoading } = useProfile();
+  const { company, loading: companyLoading } = useCompany(profile);
+  const { candidates, loading: candidatesLoading } = useCandidates(profile);
 
-  useEffect(() => {
-    if (user) {
-      fetchAdminData();
-    }
-  }, [user]);
-
-  const fetchAdminData = async () => {
-    try {
-      // Fetch user's company information
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select(`
-          company_id,
-          companies!inner(
-            id,
-            name,
-            industry,
-            email
-          )
-        `)
-        .eq('id', user?.id)
-        .single();
-
-      if (profile?.companies) {
-        setCompanyData(profile.companies);
-        
-        // Fetch candidates for this company
-        const { data: candidates } = await supabase
-          .from('candidates')
-          .select('*')
-          .eq('company_id', profile.companies.id)
-          .order('created_at', { ascending: false });
-
-        setCandidatesData(candidates || []);
-      }
-    } catch (error) {
-      console.error('Error fetching admin data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = profileLoading || companyLoading || candidatesLoading;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
       </div>
     );
   }
@@ -94,13 +34,13 @@ const DashboardContent = () => {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6 mb-8">
-        <CompanyDetailsCard companyData={companyData} />
-        <StatsCards candidatesData={candidatesData} />
+        <CompanyDetailsCard companyData={company} />
+        <StatsCards candidatesData={candidates} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <CsvUploadForm />
-        <CandidatesList candidatesData={candidatesData} />
+        <CandidatesList candidatesData={candidates} />
       </div>
     </div>
   );

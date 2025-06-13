@@ -384,6 +384,7 @@ export type Database = {
       }
       test_sessions: {
         Row: {
+          attempt: number | null
           candidate_id: string
           completed_at: string | null
           id: string
@@ -393,6 +394,7 @@ export type Database = {
           total_time_seconds: number | null
         }
         Insert: {
+          attempt?: number | null
           candidate_id: string
           completed_at?: string | null
           id?: string
@@ -402,6 +404,7 @@ export type Database = {
           total_time_seconds?: number | null
         }
         Update: {
+          attempt?: number | null
           candidate_id?: string
           completed_at?: string | null
           id?: string
@@ -442,6 +445,7 @@ export type Database = {
         | "likert_scale"
         | "true_false"
         | "open_ended"
+        | "mcq"
       test_status:
         | "pending"
         | "questions_generated"
@@ -570,6 +574,7 @@ export const Constants = {
         "likert_scale",
         "true_false",
         "open_ended",
+        "mcq",
       ],
       test_status: [
         "pending",

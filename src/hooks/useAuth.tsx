@@ -33,7 +33,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchUserRole = async (userId: string) => {
     try {
-      console.log('Fetching user role for user:', userId);
       const { data: profile, error } = await supabase
         .from('profiles')
         .select(`
@@ -45,29 +44,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) {
         console.error('Error fetching user role:', error);
-        setUserRole('candidate'); // default fallback
+        setUserRole('candidate');
         return;
       }
       
       const roleName = profile?.roles?.name || 'candidate';
-      console.log('User role fetched:', roleName);
       setUserRole(roleName);
     } catch (error) {
       console.error('Exception fetching user role:', error);
-      setUserRole('candidate'); // default fallback
+      setUserRole('candidate');
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Defer role fetching to prevent deadlocks
           setTimeout(() => {
             fetchUserRole(session.user.id);
           }, 0);
@@ -79,9 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -97,8 +90,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (email: string, password: string, fullName: string, userRole: 'admin' | 'candidate') => {
     try {
-      console.log('Attempting to sign up:', email, userRole);
-      
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -112,56 +103,65 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
       if (error) {
-        console.error('Sign up error:', error);
         toast({
           title: "Sign Up Failed",
           description: error.message,
           variant: "destructive",
         });
       } else {
-        console.log('Sign up successful');
         toast({
           title: "Account Created!",
           description: "Please check your email to verify your account.",
         });
+        
+        // If it's a candidate, trigger the n8n workflow
+        if (userRole === 'candidate') {
+          try {
+            await fetch('/api/n8n/create-candidate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email,
+                full_name: fullName,
+              }),
+            });
+          } catch (apiError) {
+            console.error('Error creating candidate via n8n:', apiError);
+          }
+        }
       }
       
       return { error };
     } catch (error: any) {
-      console.error('Sign up exception:', error);
       return { error };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Attempting to sign in:', email);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       
       if (error) {
-        console.error('Sign in error:', error);
         toast({
           title: "Login Failed",
           description: error.message,
           variant: "destructive",
         });
-      } else {
-        console.log('Sign in successful');
       }
       
       return { error };
     } catch (error: any) {
-      console.error('Sign in exception:', error);
       return { error };
     }
   };
 
   const signOut = async () => {
     try {
-      console.log('Attempting to sign out');
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);

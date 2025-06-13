@@ -3,13 +3,15 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import CandidateDashboard from "./pages/CandidateDashboard";
+import OnboardCompany from "./pages/OnboardCompany";
+import CandidateProfile from "./pages/CandidateProfile";
 import TestSection from "./pages/TestSection";
 import NotFound from "./pages/NotFound";
 
@@ -17,8 +19,8 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
+    <TooltipProvider>
+      <AuthProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -26,9 +28,17 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route 
+              path="/onboard-company" 
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <OnboardCompany />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/admin-dashboard" 
               element={
-                <ProtectedRoute requiredRole="admin">
+                <ProtectedRoute allowedRoles={['admin']}>
                   <AdminDashboard />
                 </ProtectedRoute>
               } 
@@ -36,24 +46,33 @@ const App = () => (
             <Route 
               path="/candidate-dashboard" 
               element={
-                <ProtectedRoute requiredRole="candidate">
+                <ProtectedRoute allowedRoles={['candidate']}>
                   <CandidateDashboard />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/test/:sectionId" 
+              path="/candidate-profile" 
               element={
-                <ProtectedRoute requiredRole="candidate">
+                <ProtectedRoute allowedRoles={['candidate']}>
+                  <CandidateProfile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/test-section" 
+              element={
+                <ProtectedRoute allowedRoles={['candidate']}>
                   <TestSection />
                 </ProtectedRoute>
               } 
             />
-            <Route path="*" element={<NotFound />} />
+            <Route path="/404" element={<NotFound />} />
+            <Route path="*" element={<Navigate to="/404" replace />} />
           </Routes>
         </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

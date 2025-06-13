@@ -1,239 +1,120 @@
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Brain, User, FileText, Mic, MessageSquare, Clock, LogOut, Play } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-
-interface Section {
-  id: string;
-  name: string;
-  description: string;
-  icon: any;
-  duration: string;
-  questions: number;
-  completed: boolean;
-  available: boolean;
-  time_limit_minutes: number;
-}
-
-interface CandidateData {
-  full_name: string;
-  email: string;
-  phone: string;
-  company: string;
-}
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { User, Play, RotateCcw, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuestions } from '@/hooks/useQuestions';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const CandidateDashboard = () => {
-  const [selectedSection, setSelectedSection] = useState<string | null>(null);
-  const [candidateData, setCandidateData] = useState<CandidateData>({
-    full_name: "",
-    email: "",
-    phone: "",
-    company: ""
-  });
-  const [testSections, setTestSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user } = useAuth();
-
-  // Map section names to icons
-  const sectionIcons: { [key: string]: any } = {
-    'Psychometric Assessment': Brain,
-    'Language Skills': FileText,
-    'Situational Judgment': MessageSquare,
-    'Technical Assessment': Mic
-  };
+  const { toast } = useToast();
+  const [candidateId, setCandidateId] = useState<string | null>(null);
+  const [testSessions, setTestSessions] = useState<any[]>([]);
+  const [answers, setAnswers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { questions } = useQuestions(candidateId);
 
   useEffect(() => {
-    if (user) {
-      fetchCandidateData();
-      fetchSections();
-    }
-  }, [user]);
+    if (!user) return;
 
-  const fetchCandidateData = async () => {
-    try {
-      // Get candidate record
-      const { data: candidate, error: candidateError } = await supabase
-        .from('candidates')
-        .select('*, companies(name)')
-        .eq('user_id', user?.id)
-        .single();
+    const fetchCandidateData = async () => {
+      try {
+        // Get candidate info
+        const { data: candidate, error: candidateError } = await supabase
+          .from('candidates')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
 
-      if (candidateError) {
-        console.error('Error fetching candidate data:', candidateError);
-        return;
-      }
+        if (candidateError) throw candidateError;
+        setCandidateId(candidate.id);
 
-      if (candidate) {
-        setCandidateData({
-          full_name: candidate.full_name,
-          email: candidate.email,
-          phone: candidate.phone || '',
-          company: candidate.companies?.name || ''
-        });
-      }
-    } catch (error) {
-      console.error('Error in fetchCandidateData:', error);
-    }
-  };
+        // Get test sessions
+        const { data: sessions, error: sessionsError } = await supabase
+          .from('test_sessions')
+          .select('*')
+          .eq('candidate_id', candidate.id);
 
-  const fetchSections = async () => {
-    try {
-      setLoading(true);
-      
-      // Get candidate ID
-      const { data: candidate, error: candidateError } = await supabase
-        .from('candidates')
-        .select('id')
-        .eq('user_id', user?.id)
-        .single();
+        if (sessionsError) throw sessionsError;
+        setTestSessions(sessions || []);
 
-      if (candidateError) {
-        console.error('Error fetching candidate ID:', candidateError);
-        setLoading(false);
-        return;
-      }
-
-      // Get all sections
-      const { data: sectionsData, error: sectionsError } = await supabase
-        .from('sections')
-        .select('*')
-        .order('display_order');
-
-      if (sectionsError) {
-        console.error('Error fetching sections:', sectionsError);
-        setLoading(false);
-        return;
-      }
-
-      // For each section, check if questions exist for this candidate
-      const sectionsWithAvailability = await Promise.all(sectionsData.map(async (section) => {
-        // Check if questions exist for this section and candidate
-        const { data: questions, error: questionsError } = await supabase
-          .from('questions')
-          .select('id')
-          .eq('section_id', section.id)
-          .eq('candidate_id', candidate?.id);
-
-        if (questionsError) {
-          console.error(`Error checking questions for section ${section.name}:`, questionsError);
-        }
-
-        // Check if answers exist for this section (to determine if completed)
-        const { data: answers, error: answersError } = await supabase
+        // Get answers
+        const { data: answersData, error: answersError } = await supabase
           .from('answers')
-          .select('id')
-          .eq('section_id', section.id)
-          .eq('candidate_id', candidate?.id);
+          .select('*')
+          .eq('candidate_id', candidate.id);
 
-        if (answersError) {
-          console.error(`Error checking answers for section ${section.name}:`, answersError);
-        }
+        if (answersError) throw answersError;
+        setAnswers(answersData || []);
 
-        const available = questions && questions.length > 0;
-        const completed = answers && answers.length > 0 && answers.length >= (questions?.length || 0);
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-        return {
-          id: section.id,
-          name: section.name,
-          description: section.description || '',
-          icon: sectionIcons[section.name] || FileText,
-          duration: `${section.time_limit_minutes} minutes`,
-          questions: questions?.length || 0,
-          completed: completed,
-          available: available,
-          time_limit_minutes: section.time_limit_minutes
-        };
-      }));
+    fetchCandidateData();
+  }, [user, toast]);
 
-      setTestSections(sectionsWithAvailability);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error in fetchSections:', error);
-      setLoading(false);
+  const getTestProgress = () => {
+    if (questions.length === 0) return 0;
+    return Math.round((answers.length / questions.length) * 100);
+  };
+
+  const getTestStatus = () => {
+    if (questions.length === 0) return 'pending';
+    if (answers.length === 0) return 'not_started';
+    if (answers.length < questions.length) return 'in_progress';
+    return 'completed';
+  };
+
+  const canRetry = () => {
+    const completedSessions = testSessions.filter(s => s.status === 'completed');
+    return completedSessions.length > 0 && completedSessions.length < 2;
+  };
+
+  const handleStartTest = () => {
+    if (candidateId) {
+      navigate(`/test-section?candidateId=${candidateId}`);
     }
   };
 
-  const completedSections = testSections.filter(s => s.completed).length;
-  const totalSections = testSections.length;
-  const progressPercentage = totalSections > 0 ? (completedSections / totalSections) * 100 : 0;
+  const handleRetryTest = async () => {
+    if (!candidateId) return;
 
-  const handleStartSection = async (sectionId: string) => {
-    const section = testSections.find(s => s.id === sectionId);
-    if (!section?.available) {
-      toast({
-        title: "Section Not Available",
-        description: "Questions for this section haven't been generated yet.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Get candidate ID
-    const { data: candidate, error: candidateError } = await supabase
-      .from('candidates')
-      .select('id')
-      .eq('user_id', user?.id)
-      .single();
-
-    if (candidateError) {
-      console.error('Error fetching candidate ID:', candidateError);
-      toast({
-        title: "Error",
-        description: "Could not retrieve your candidate information",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Double check that questions exist for this section
-    const { data: questions, error: questionsError } = await supabase
-      .from('questions')
-      .select('id')
-      .eq('section_id', sectionId)
-      .eq('candidate_id', candidate?.id);
-
-    if (questionsError || !questions || questions.length === 0) {
-      console.error('Error checking questions:', questionsError);
-      toast({
-        title: "No Questions Available",
-        description: "There are no questions available for this section yet.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({
-      title: "Starting Test Section",
-      description: `Beginning ${section.name}...`,
-    });
-
-    setTimeout(() => {
-      navigate(`/test/${sectionId}`);
-    }, 1000);
-  };
-
-  const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out",
-      });
-      navigate("/");
-    } catch (error) {
-      console.error('Error signing out:', error);
+      // Clear previous answers
+      await supabase
+        .from('answers')
+        .delete()
+        .eq('candidate_id', candidateId);
+
+      // Create new test session
+      await supabase
+        .from('test_sessions')
+        .insert({
+          candidate_id: candidateId,
+          section_id: questions[0]?.section_id,
+          attempt: testSessions.length + 1,
+        });
+
+      navigate(`/test-section?candidateId=${candidateId}`);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to log out",
+        description: error.message,
         variant: "destructive",
       });
     }
@@ -241,200 +122,131 @@ const CandidateDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-cyan-600 mx-auto mb-4"></div>
-          <p className="text-cyan-800 font-medium">Loading your dashboard...</p>
-        </div>
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center space-x-2">
-              <Brain className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
-            </Link>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Welcome, {candidateData.full_name}</span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+  const testStatus = getTestStatus();
+  const progress = getTestProgress();
 
-      <div className="container mx-auto px-4 py-8">
+  return (
+    <div className="min-h-screen bg-stone-50 p-4">
+      <div className="container mx-auto max-w-4xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Candidate Dashboard</h1>
-          <p className="text-gray-600">Complete your assessment sections at your own pace</p>
+          <p className="text-gray-600">Welcome back! Here's your test progress.</p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Test Progress Card */}
+          <Card className="col-span-full lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-cyan-600">
+                <Play className="h-5 w-5" />
+                Test Progress
+              </CardTitle>
+              <CardDescription>
+                Your current progress through the assessment
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Progress</span>
+                <span className="text-sm text-gray-500">{answers.length} of {questions.length} questions</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <div className="flex items-center gap-2">
+                <Badge variant={
+                  testStatus === 'completed' ? 'default' :
+                  testStatus === 'in_progress' ? 'secondary' :
+                  testStatus === 'not_started' ? 'outline' : 'destructive'
+                }>
+                  {testStatus === 'completed' ? 'Completed' :
+                   testStatus === 'in_progress' ? 'In Progress' :
+                   testStatus === 'not_started' ? 'Not Started' : 'Pending'}
+                </Badge>
+                {questions.length > 0 && (
+                  <span className="text-sm text-gray-500">
+                    {questions.length} questions available
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {testStatus === 'completed' && canRetry() && (
+                  <Button onClick={handleRetryTest} variant="outline" className="flex-1">
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Retry Test
+                  </Button>
+                )}
+                {(testStatus === 'not_started' || testStatus === 'in_progress') && questions.length > 0 && (
+                  <Button onClick={handleStartTest} className="flex-1 bg-cyan-500 hover:bg-cyan-600">
+                    <Play className="h-4 w-4 mr-2" />
+                    {testStatus === 'not_started' ? 'Start Test' : 'Continue Test'}
+                  </Button>
+                )}
+                {questions.length === 0 && (
+                  <div className="text-sm text-gray-500 p-4 bg-gray-100 rounded">
+                    No questions available yet. Please wait for your test to be generated.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Profile Card */}
           <Card>
-            <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Your Profile</CardTitle>
-              <User className="h-4 w-4 ml-auto text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-sm text-gray-600">Full Name</p>
-                  <p className="font-medium">{candidateData.full_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Email</p>
-                  <p className="font-medium">{candidateData.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Phone</p>
-                  <p className="font-medium">{candidateData.phone}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Company</p>
-                  <p className="font-medium">{candidateData.company}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Progress Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Test Progress</CardTitle>
-              <FileText className="h-4 w-4 ml-auto text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="text-2xl font-bold">{completedSections}/{totalSections}</div>
-                <p className="text-sm text-gray-600">Sections Completed</p>
-                <Progress value={progressPercentage} className="h-2" />
-                <p className="text-xs text-muted-foreground">
-                  {progressPercentage.toFixed(0)}% Complete
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Instructions Card */}
-          <Card>
             <CardHeader>
-              <CardTitle className="text-sm font-medium">Test Instructions</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-cyan-600">
+                <User className="h-5 w-5" />
+                Profile
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-600">
-                  • Complete all available sections
-                </p>
-                <p className="text-gray-600">
-                  • Take your time, but be mindful of time limits
-                </p>
-                <p className="text-gray-600">
-                  • Save your progress regularly
-                </p>
-                <p className="text-gray-600">
-                  • Contact support if you face issues
-                </p>
-              </div>
+              <Button 
+                onClick={() => navigate('/candidate-profile')} 
+                variant="outline" 
+                className="w-full"
+              >
+                Edit Profile
+              </Button>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Test Sections */}
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Assessment Sections</h2>
-            <p className="text-gray-600 mb-6">
-              Click on any available section to begin your assessment
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {testSections.map((section) => {
-              const Icon = section.icon;
-              return (
-                <Card key={section.id} className={`transition-all duration-200 ${section.available ? 'hover:shadow-lg cursor-pointer' : 'opacity-60'}`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className={`p-2 rounded-lg ${section.available ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                          <Icon className={`h-6 w-6 ${section.available ? 'text-blue-600' : 'text-gray-400'}`} />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">{section.name}</CardTitle>
-                          <CardDescription>{section.description}</CardDescription>
-                        </div>
+          {/* Results Card */}
+          <Card className="col-span-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-cyan-600">
+                <FileText className="h-5 w-5" />
+                Test History
+              </CardTitle>
+              <CardDescription>
+                Your previous test attempts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {testSessions.length > 0 ? (
+                <div className="space-y-2">
+                  {testSessions.map((session, index) => (
+                    <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                      <div>
+                        <span className="font-medium">Attempt {session.attempt || index + 1}</span>
+                        <p className="text-sm text-gray-500">
+                          {session.started_at ? new Date(session.started_at).toLocaleDateString() : 'Not started'}
+                        </p>
                       </div>
-                      {section.completed && (
-                        <Badge variant="default" className="bg-green-600">
-                          Completed
-                        </Badge>
-                      )}
-                      {!section.available && (
-                        <Badge variant="secondary">
-                          Pending
-                        </Badge>
-                      )}
+                      <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
+                        {session.status || 'In Progress'}
+                      </Badge>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4" />
-                          <span>{section.duration}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <FileText className="h-4 w-4" />
-                          <span>{section.questions} questions</span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => handleStartSection(section.id)}
-                      disabled={!section.available || section.completed}
-                      className="w-full"
-                      variant={section.completed ? "outline" : "default"}
-                    >
-                      {section.completed ? (
-                        "Review Answers"
-                      ) : (
-                        <>
-                          <Play className="w-4 h-4 mr-2" />
-                          {section.available ? "Start Section" : "Not Available"}
-                        </>
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Final Submit */}
-          {completedSections === totalSections && (
-            <Card className="border-green-200 bg-green-50">
-              <CardHeader>
-                <CardTitle className="text-green-800">Assessment Complete</CardTitle>
-                <CardDescription className="text-green-700">
-                  You have completed all sections. Submit your final assessment.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full bg-green-600 hover:bg-green-700">
-                  Submit Final Assessment
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500">No test sessions yet</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

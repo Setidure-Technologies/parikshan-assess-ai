@@ -2,47 +2,57 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'candidate';
+  allowedRoles?: string[];
 }
 
-const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
-  const { user, userRole, loading } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles = [] }: ProtectedRouteProps) => {
+  const { user, loading } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        navigate('/login');
+    if (loading || profileLoading) return;
+
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    // Check if admin needs company onboarding
+    if (profile?.roles?.name === 'admin' && !profile.company_id) {
+      navigate('/onboard-company');
+      return;
+    }
+
+    // Check role permissions
+    if (allowedRoles.length > 0 && profile?.roles?.name) {
+      if (!allowedRoles.includes(profile.roles.name)) {
+        // Redirect to appropriate dashboard based on role
+        if (profile.roles.name === 'admin') {
+          navigate('/admin-dashboard');
+        } else if (profile.roles.name === 'candidate') {
+          navigate('/candidate-dashboard');
+        } else {
+          navigate('/');
+        }
         return;
       }
-      
-      if (requiredRole && userRole !== requiredRole) {
-        // Redirect based on user role
-        if (userRole === 'admin') {
-          navigate('/admin-dashboard');
-        } else {
-          navigate('/candidate-dashboard');
-        }
-      }
     }
-  }, [user, userRole, loading, navigate, requiredRole]);
+  }, [user, profile, loading, profileLoading, navigate, allowedRoles]);
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-cyan-600"></div>
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
       </div>
     );
   }
 
   if (!user) {
-    return null;
-  }
-
-  if (requiredRole && userRole !== requiredRole) {
     return null;
   }
 
