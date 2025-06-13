@@ -24,24 +24,33 @@ const CandidateProfile = () => {
 
     const fetchCandidateData = async () => {
       try {
+        console.log('Fetching candidate data for user:', user.id);
+        
         const { data, error } = await supabase
           .from('candidates')
           .select('*')
           .eq('user_id', user.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') throw error;
+        if (error && error.code !== 'PGRST116') {
+          console.error('Candidate fetch error:', error);
+          throw error;
+        }
         
         if (data) {
+          console.log('Candidate data found:', data);
           setCandidateId(data.id);
           setFullName(data.full_name || '');
           setPhone(data.phone || '');
           setProfileData(JSON.stringify(data.profile_data || {}, null, 2));
+        } else {
+          console.log('No candidate data found for user');
         }
       } catch (error: any) {
+        console.error('Error fetching candidate data:', error);
         toast({
           title: "Error",
-          description: error.message,
+          description: error.message || "Failed to load profile",
           variant: "destructive",
         });
       } finally {
@@ -54,7 +63,14 @@ const CandidateProfile = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!candidateId) return;
+    if (!candidateId) {
+      toast({
+        title: "Error",
+        description: "No candidate profile found",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -83,7 +99,7 @@ const CandidateProfile = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to update profile",
         variant: "destructive",
       });
     } finally {
@@ -106,7 +122,7 @@ const CandidateProfile = () => {
           <CardHeader>
             <CardTitle className="text-cyan-600">Profile Not Found</CardTitle>
             <CardDescription>
-              No candidate profile found for your account.
+              No candidate profile found for your account. Please contact your administrator.
             </CardDescription>
           </CardHeader>
         </Card>

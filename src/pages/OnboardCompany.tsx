@@ -20,10 +20,19 @@ const OnboardCompany = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyName || !industry || !user) return;
+    if (!companyName || !industry || !user) {
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
+      console.log('Creating company for user:', user.id);
+      
       // Create company
       const { data: company, error: companyError } = await supabase
         .from('companies')
@@ -35,7 +44,12 @@ const OnboardCompany = () => {
         .select()
         .single();
 
-      if (companyError) throw companyError;
+      if (companyError) {
+        console.error('Company creation error:', companyError);
+        throw companyError;
+      }
+
+      console.log('Company created:', company);
 
       // Update profile with company_id
       const { error: profileError } = await supabase
@@ -43,18 +57,28 @@ const OnboardCompany = () => {
         .update({ company_id: company.id })
         .eq('id', user.id);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+        throw profileError;
+      }
+
+      console.log('Profile updated with company_id:', company.id);
 
       toast({
         title: "Company Created!",
         description: "Your company has been successfully set up.",
       });
 
-      navigate('/admin-dashboard');
+      // Force a page reload to refresh all hooks and then navigate
+      setTimeout(() => {
+        window.location.href = '/admin-dashboard';
+      }, 1000);
+
     } catch (error: any) {
+      console.error('Onboarding error:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to create company",
         variant: "destructive",
       });
     } finally {

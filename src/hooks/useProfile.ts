@@ -31,6 +31,43 @@ export const useProfile = () => {
 
     const fetchProfile = async () => {
       try {
+        console.log('Fetching profile for user:', user.id);
+        
+        const { data, error } = await supabase
+          .from('profiles')
+          .select(`
+            *,
+            roles!inner(name)
+          `)
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Profile fetch error:', error);
+          throw error;
+        }
+        
+        console.log('Profile fetched:', data);
+        setProfile(data);
+        setError(null);
+      } catch (err: any) {
+        console.error('Profile fetch exception:', err);
+        setError(err.message);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
+
+  const refetch = async () => {
+    if (user) {
+      setLoading(true);
+      setError(null);
+      
+      try {
         const { data, error } = await supabase
           .from('profiles')
           .select(`
@@ -44,18 +81,12 @@ export const useProfile = () => {
         setProfile(data);
       } catch (err: any) {
         setError(err.message);
+        setProfile(null);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchProfile();
-  }, [user]);
-
-  return { profile, loading, error, refetch: () => {
-    if (user) {
-      setLoading(true);
-      // Re-trigger the effect by updating a dependency
     }
-  }};
+  };
+
+  return { profile, loading, error, refetch };
 };

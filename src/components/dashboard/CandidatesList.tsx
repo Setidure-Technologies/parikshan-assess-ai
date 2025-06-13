@@ -1,8 +1,6 @@
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users } from "lucide-react";
 
 interface CandidateData {
@@ -12,6 +10,7 @@ interface CandidateData {
   phone?: string;
   test_status: string;
   company_id: string;
+  created_at: string;
 }
 
 interface CandidatesListProps {
@@ -21,67 +20,52 @@ interface CandidatesListProps {
 const CandidatesList = ({ candidatesData }: CandidatesListProps) => {
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pending":
-        return <Badge variant="secondary">{status}</Badge>;
-      case "questions_generated":
-        return <Badge variant="default" className="bg-blue-600">Questions Generated</Badge>;
-      case "in_progress":
-        return <Badge variant="default" className="bg-yellow-600">In Progress</Badge>;
-      case "completed":
-        return <Badge variant="default" className="bg-green-600">Completed</Badge>;
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-amber-100 text-amber-800">In Progress</Badge>;
+      case 'questions_generated':
+        return <Badge className="bg-cyan-100 text-cyan-800">Ready</Badge>;
+      case 'pending':
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800">Pending</Badge>;
     }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Candidates</CardTitle>
-        <CardDescription>
-          Overview of candidate status and progress
-        </CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="h-5 w-5" />
+          Candidates ({candidatesData.length})
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {candidatesData.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {candidatesData.slice(0, 6).map((candidate) => (
-                  <TableRow key={candidate.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{candidate.full_name}</p>
-                        <p className="text-sm text-gray-500">{candidate.email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(candidate.test_status)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="text-center py-8">
-              <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No candidates yet</h3>
-              <p className="text-gray-500">Upload a CSV file to add candidates</p>
-            </div>
-          )}
-          
-          {candidatesData.length > 6 && (
-            <Button variant="outline" className="w-full">
-              View All {candidatesData.length} Candidates
-            </Button>
-          )}
-        </div>
+        {candidatesData.length === 0 ? (
+          <p className="text-gray-500 text-center py-4">
+            No candidates found. Upload a CSV file to add candidates.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {candidatesData.map((candidate) => (
+              <div
+                key={candidate.id}
+                className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+              >
+                <div className="flex-1">
+                  <h4 className="font-medium">{candidate.full_name}</h4>
+                  <p className="text-sm text-gray-600">{candidate.email}</p>
+                  {candidate.phone && (
+                    <p className="text-sm text-gray-500">{candidate.phone}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {getStatusBadge(candidate.test_status)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
