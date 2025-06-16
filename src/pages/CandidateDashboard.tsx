@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { User, Play, RotateCcw, FileText, Clock } from 'lucide-react';
+import { User, Play, RotateCcw, FileText, Clock, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +28,7 @@ const CandidateDashboard = () => {
   const [sections, setSections] = useState<Section[]>([]);
   const [testSessions, setTestSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmittingFinal, setIsSubmittingFinal] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -132,6 +133,10 @@ const CandidateDashboard = () => {
     return completedSessions.length > 0 && completedSessions.length < 2;
   };
 
+  const areAllSectionsCompleted = () => {
+    return sections.length > 0 && sections.every(section => getSectionStatus(section) === 'completed');
+  };
+
   const handleStartTest = (sectionId: string) => {
     if (candidateId) {
       navigate(`/test-section/${sectionId}?candidateId=${candidateId}`);
@@ -168,6 +173,75 @@ const CandidateDashboard = () => {
     }
   };
 
+  const handleFinalSubmission = async () => {
+    if (!candidateId || !user) return;
+
+    setIsSubmittingFinal(true);
+
+    try {
+      // Get candidate details for submission
+      const { data: candidate, error: candidateError } = await supabase
+        .from('candidates')
+        .select('*')
+        .eq('id', candidateId)
+        .single();
+
+      if (candidateError) throw candidateError;
+
+      // Prepare submission data
+      const submissionData = {
+        candidate_id: candidateId,
+        candidate_email: candidate.email,
+        candidate_name: candidate.full_name,
+        user_id: user.id,
+        company_id: candidate.company_id,
+        sections_completed: sections.length,
+        total_answers: sections.reduce((sum, section) => sum + section.completed_answers, 0),
+        submission_timestamp: new Date().toISOString(),
+        test_status: 'completed'
+      };
+
+      console.log('Submitting final test data:', submissionData);
+
+      // Send to n8n webhook for test evaluation
+      const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submissionData),
+      });
+
+      if (!webhookResponse.ok) {
+        throw new Error('Failed to submit test for evaluation');
+      }
+
+      // Update candidate status in database
+      await supabase
+        .from('candidates')
+        .update({ test_status: 'completed' })
+        .eq('id', candidateId);
+
+      toast({
+        title: "Test Submitted Successfully!",
+        description: "Your test has been submitted for evaluation. You will be notified of the results.",
+      });
+
+      // Refresh the page to show updated status
+      window.location.reload();
+
+    } catch (error: any) {
+      console.error('Error submitting final test:', error);
+      toast({
+        title: "Submission Error",
+        description: error.message || "Failed to submit test. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingFinal(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
@@ -183,6 +257,31 @@ const CandidateDashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Candidate Dashboard</h1>
           <p className="text-gray-600">Welcome back! Here are your available assessments.</p>
         </div>
+
+        {/* Final Submission Button */}
+        {areAllSectionsCompleted() && (
+          <Card className="mb-6 border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-green-700">
+                <CheckCircle className="h-5 w-5" />
+                All Sections Completed!
+              </CardTitle>
+              <CardDescription>
+                You have completed all test sections. Click below to submit your final test for evaluation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={handleFinalSubmission}
+                disabled={isSubmittingFinal}
+                className="bg-green-600 hover:bg-green-700"
+                size="lg"
+              >
+                {isSubmittingFinal ? "Submitting..." : "Submit Final Test"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Profile Card */}
