@@ -39,11 +39,12 @@ const TestSection = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sectionName, setSectionName] = useState('');
+  const [candidateId, setCandidateId] = useState<string | null>(null);
 
   // Load questions from database
   useEffect(() => {
     const loadQuestions = async () => {
-      if (!user) return;
+      if (!user || !sectionId) return;
       
       try {
         console.log('Loading questions for section:', sectionId);
@@ -78,6 +79,7 @@ const TestSection = () => {
         }
 
         console.log('Found candidate ID:', candidate.id);
+        setCandidateId(candidate.id);
 
         // Get section info
         const { data: section, error: sectionError } = await supabase
@@ -245,20 +247,12 @@ const TestSection = () => {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !candidateId) return;
     
     try {
-      const { data: candidate } = await supabase
-        .from('candidates')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!candidate) return;
-
       // Save current answers
       const answersToSave = Object.entries(answers).map(([qIndex, answer]) => ({
-        candidate_id: candidate.id,
+        candidate_id: candidateId,
         question_id: questions[parseInt(qIndex)]?.id,
         section_id: sectionId,
         answer_data: { value: answer, question_index: parseInt(qIndex) }
@@ -296,41 +290,6 @@ const TestSection = () => {
       navigate("/candidate-dashboard");
     }, 1500);
   };
-
-  // Question timer
-  useEffect(() => {
-    if (questionTimeRemaining <= 0) return;
-    
-    const timer = setInterval(() => {
-      setQuestionTimeRemaining(prev => {
-        if (prev <= 1) {
-          // Auto-move to next question when time runs out
-          if (currentQuestion < questions.length - 1) {
-            handleNext();
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [questionTimeRemaining, currentQuestion, questions.length]);
-
-  // Total timer
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTotalTimeRemaining((prev) => {
-        if (prev <= 1) {
-          handleAutoSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   if (loading) {
     return (

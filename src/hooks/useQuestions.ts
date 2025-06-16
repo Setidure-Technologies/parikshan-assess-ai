@@ -13,7 +13,7 @@ interface Question {
   metadata: any;
 }
 
-export const useQuestions = (candidateId: string | null) => {
+export const useQuestions = (candidateId: string | null, sectionId?: string) => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +27,17 @@ export const useQuestions = (candidateId: string | null) => {
 
     const fetchQuestions = async () => {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('questions')
           .select('*')
           .eq('candidate_id', candidateId)
           .order('question_number');
+
+        if (sectionId) {
+          query = query.eq('section_id', sectionId);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         setQuestions(data || []);
@@ -43,7 +49,7 @@ export const useQuestions = (candidateId: string | null) => {
     };
 
     fetchQuestions();
-  }, [candidateId]);
+  }, [candidateId, sectionId]);
 
   return { questions, loading, error };
 };
