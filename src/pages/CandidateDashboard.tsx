@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -179,47 +178,129 @@ const CandidateDashboard = () => {
     setIsSubmittingFinal(true);
 
     try {
-      // Get candidate details for submission
+      // Get comprehensive candidate and test data
       const { data: candidate, error: candidateError } = await supabase
         .from('candidates')
-        .select('*')
+        .select(`
+          *,
+          companies (
+            id,
+            name,
+            email,
+            industry
+          )
+        `)
         .eq('id', candidateId)
         .single();
 
       if (candidateError) throw candidateError;
 
-      // Prepare submission data
+      // Get all answers with section details
+      const { data: allAnswers, error: answersError } = await supabase
+        .from('answers')
+        .select(`
+          *,
+          sections (
+            id,
+            name,
+            description
+          ),
+          questions (
+            id,
+            question_text,
+            question_type,
+            options
+          )
+        `)
+        .eq('candidate_id', candidateId);
+
+      if (answersError) throw answersError;
+
+      // Get all test sessions
+      const { data: allSessions, error: sessionsError } = await supabase
+        .from('test_sessions')
+        .select('*')
+        .eq('candidate_id', candidateId);
+
+      if (sessionsError) throw sessionsError;
+
+      // Calculate total time taken across all sessions
+      const totalTimeSpent = allSessions?.reduce((total, session) => {
+        return total + (session.total_time_seconds || 0);
+      }, 0) || 0;
+
+      // Prepare comprehensive submission data
       const submissionData = {
+        // Candidate Information
         candidate_id: candidateId,
         candidate_email: candidate.email,
         candidate_name: candidate.full_name,
+        candidate_phone: candidate.phone,
+        candidate_profile_data: candidate.profile_data,
         user_id: user.id,
+        
+        // Company Information
         company_id: candidate.company_id,
+        company_name: candidate.companies?.name,
+        company_email: candidate.companies?.email,
+        company_industry: candidate.companies?.industry,
+        
+        // Test Statistics
         sections_completed: sections.length,
+        total_questions: sections.reduce((sum, section) => sum + section.question_count, 0),
         total_answers: sections.reduce((sum, section) => sum + section.completed_answers, 0),
+        total_time_spent_seconds: totalTimeSpent,
+        
+        // Test Data
+        answers: allAnswers,
+        test_sessions: allSessions,
+        sections_data: sections,
+        
+        // Metadata
         submission_timestamp: new Date().toISOString(),
-        test_status: 'completed'
+        test_status: 'completed',
+        submitted_from: window.location.origin,
+        
+        // Section-wise breakdown
+        section_breakdown: sections.map(section => ({
+          section_id: section.id,
+          section_name: section.name,
+          questions_count: section.question_count,
+          answers_count: section.completed_answers,
+          completion_percentage: getSectionProgress(section),
+          status: getSectionStatus(section)
+        }))
       };
 
-      console.log('Submitting final test data:', submissionData);
+      console.log('Submitting comprehensive test data to n8n:', submissionData);
 
-      // Send to n8n webhook for test evaluation
+      // Send to n8n webhook with proper headers
       const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Candidate-ID': candidateId,
+          'X-Company-ID': candidate.company_id,
+          'X-User-ID': user.id,
+          'X-Submission-Time': new Date().toISOString(),
         },
         body: JSON.stringify(submissionData),
       });
 
       if (!webhookResponse.ok) {
-        throw new Error('Failed to submit test for evaluation');
+        const errorText = await webhookResponse.text();
+        console.error('Webhook response error:', errorText);
+        throw new Error(`Failed to submit test for evaluation: ${webhookResponse.status} ${webhookResponse.statusText}`);
       }
 
       // Update candidate status in database
       await supabase
         .from('candidates')
-        .update({ test_status: 'completed' })
+        .update({ 
+          test_status: 'completed',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', candidateId);
 
       toast({
