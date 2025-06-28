@@ -107,8 +107,8 @@ const CsvUploadForm = () => {
 
       console.log('Sending to production n8n webhook:', JSON.stringify(webhookPayload, null, 2));
 
-      // Send to production n8n webhook
-      const response = await fetch('https://n8n.erudites.in/webhook/usercreation', {
+      // Send to production n8n webhook for user creation
+      const response = await fetch('https://n8n.erudites.in/webhook-test/usercreation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,16 +120,16 @@ const CsvUploadForm = () => {
         body: JSON.stringify(webhookPayload),
       });
 
-      console.log('N8N response status:', response.status);
+      console.log('Production webhook response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('N8N webhook failed:', errorText);
-        throw new Error(`N8N webhook failed: ${response.status} - ${errorText}`);
+        console.error('Production webhook failed:', errorText);
+        throw new Error(`Production webhook failed: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('N8N response:', result);
+      console.log('Production webhook response:', result);
 
       toast({
         title: "Upload Started",
@@ -252,7 +252,7 @@ const CsvUploadForm = () => {
             <li>Candidates can take their assessments immediately</li>
           </ol>
           <div className="mt-2 p-2 bg-green-100 rounded text-xs text-green-800">
-            <strong>Production Webhook:</strong> https://n8n.erudites.in/webhook/usercreation
+            <strong>Production Webhook:</strong> https://n8n.erudites.in/webhook-test/usercreation
           </div>
         </div>
       </CardContent>
