@@ -229,7 +229,7 @@ const CandidateDashboard = () => {
         return total + (session.total_time_seconds || 0);
       }, 0) || 0;
 
-      // Prepare comprehensive submission data
+      // Prepare comprehensive submission data for production webhook
       const submissionData = {
         // Candidate Information
         candidate_id: candidateId,
@@ -272,9 +272,9 @@ const CandidateDashboard = () => {
         }))
       };
 
-      console.log('Submitting comprehensive test data to n8n:', submissionData);
+      console.log('Submitting comprehensive test data to production n8n webhook:', submissionData);
 
-      // Send to n8n webhook with proper headers
+      // Send to production n8n webhook for test evaluation
       const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
         method: 'POST',
         headers: {
@@ -284,15 +284,21 @@ const CandidateDashboard = () => {
           'X-Company-ID': candidate.company_id,
           'X-User-ID': user.id,
           'X-Submission-Time': new Date().toISOString(),
+          'X-Test-Status': 'completed',
         },
         body: JSON.stringify(submissionData),
       });
 
+      console.log('Production webhook response status:', webhookResponse.status);
+
       if (!webhookResponse.ok) {
         const errorText = await webhookResponse.text();
-        console.error('Webhook response error:', errorText);
+        console.error('Production webhook response error:', errorText);
         throw new Error(`Failed to submit test for evaluation: ${webhookResponse.status} ${webhookResponse.statusText}`);
       }
+
+      const webhookResult = await webhookResponse.json();
+      console.log('Production webhook response:', webhookResult);
 
       // Update candidate status in database
       await supabase
@@ -308,8 +314,10 @@ const CandidateDashboard = () => {
         description: "Your test has been submitted for evaluation. You will be notified of the results.",
       });
 
-      // Refresh the page to show updated status
-      window.location.reload();
+      // Refresh the page after a short delay to show updated status
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
 
     } catch (error: any) {
       console.error('Error submitting final test:', error);
@@ -360,6 +368,9 @@ const CandidateDashboard = () => {
               >
                 {isSubmittingFinal ? "Submitting..." : "Submit Final Test"}
               </Button>
+              <div className="mt-3 p-2 bg-blue-100 rounded text-xs text-blue-800">
+                <strong>Production Webhook:</strong> https://n8n.erudites.in/webhook-test/testevaluation
+              </div>
             </CardContent>
           </Card>
         )}
