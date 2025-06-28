@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,38 +63,77 @@ const CsvUploadForm = () => {
 
     setLoading(true);
     try {
-      // Create FormData for binary file upload
-      const formData = new FormData();
-      formData.append('csvFile', file);
-      formData.append('adminUserId', profile.id);
-      formData.append('companyId', profile.company_id);
-      formData.append('companyName', company.name);
-      formData.append('industry', company.industry);
-      formData.append('filename', file.name);
+      // Read CSV content
+      const csvContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.onerror = reject;
+        reader.readAsText(file);
+      });
 
-      console.log('Uploading CSV with admin details:', {
-        adminUserId: profile.id,
-        companyId: profile.company_id,
-        companyName: company.name,
+      // Parse CSV content into candidate records
+      const lines = csvContent.split('\n').filter((line: string) => line.trim());
+      if (lines.length < 2) {
+        throw new Error('CSV must have a header and at least one data row.');
+      }
+      
+      const candidates = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map((v: string) => v.trim());
+        if (values.length >= 2) { // At least name and email
+          const candidate = {
+            full_name: values[0] || '',
+            email: values[1] || '',
+            phone: values[2] || null,
+            company_id: profile.company_id
+          };
+          candidates.push(candidate);
+        }
+      }
+
+      console.log(`Parsed ${candidates.length} candidates from CSV.`);
+
+      // Prepare payload for production n8n webhook
+      const webhookPayload = {
+        action: 'bulk_create_candidates',
+        candidates: candidates,
+        company_id: profile.company_id,
+        admin_user_id: profile.id,
+        company_name: company.name,
         industry: company.industry,
-        filename: file.name
+        filename: file.name,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('Sending to production n8n webhook:', JSON.stringify(webhookPayload, null, 2));
+
+      // Send to production n8n webhook
+      const response = await fetch('https://n8n.erudites.in/webhook/usercreation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Admin-ID': profile.id,
+          'X-Company-ID': profile.company_id,
+          'X-Timestamp': new Date().toISOString(),
+        },
+        body: JSON.stringify(webhookPayload),
       });
 
-      const response = await fetch('/api/n8n/csv-upload', {
-        method: 'POST',
-        body: formData, // Send as FormData for binary upload
-      });
+      console.log('N8N response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('N8N webhook failed:', errorText);
+        throw new Error(`N8N webhook failed: ${response.status} - ${errorText}`);
+      }
 
       const result = await response.json();
-      console.log('Upload response:', result);
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Upload failed');
-      }
+      console.log('N8N response:', result);
 
       toast({
         title: "Upload Started",
-        description: `Processing ${result.candidates_count || 'multiple'} candidates. Questions will be generated automatically.`,
+        description: `Processing ${candidates.length} candidates. Questions will be generated automatically.`,
       });
 
       setFile(null);
@@ -207,12 +245,15 @@ const CsvUploadForm = () => {
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <h4 className="text-sm font-medium text-blue-900 mb-2">What happens next:</h4>
           <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>CSV file uploaded with admin and company details</li>
+            <li>CSV file processed with admin and company details</li>
             <li>Candidates are created from your CSV</li>
             <li>AI generates personalized questions for each candidate</li>
             <li>Test credentials are automatically sent to candidates</li>
             <li>Candidates can take their assessments immediately</li>
           </ol>
+          <div className="mt-2 p-2 bg-green-100 rounded text-xs text-green-800">
+            <strong>Production Webhook:</strong> https://n8n.erudites.in/webhook/usercreation
+          </div>
         </div>
       </CardContent>
     </Card>
