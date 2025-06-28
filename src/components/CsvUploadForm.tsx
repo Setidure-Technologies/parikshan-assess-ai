@@ -63,77 +63,39 @@ const CsvUploadForm = () => {
 
     setLoading(true);
     try {
-      // Read CSV content
-      const csvContent = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => resolve(event.target?.result as string);
-        reader.onerror = reject;
-        reader.readAsText(file);
-      });
+      // Create FormData for binary file upload
+      const formData = new FormData();
+      formData.append('csvFile', file);
+      formData.append('adminUserId', profile.id);
+      formData.append('companyId', profile.company_id);
+      formData.append('companyName', company.name);
+      formData.append('industry', company.industry);
+      formData.append('filename', file.name);
 
-      // Parse CSV content into candidate records
-      const lines = csvContent.split('\n').filter((line: string) => line.trim());
-      if (lines.length < 2) {
-        throw new Error('CSV must have a header and at least one data row.');
-      }
-      
-      const candidates = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map((v: string) => v.trim());
-        if (values.length >= 2) { // At least name and email
-          const candidate = {
-            full_name: values[0] || '',
-            email: values[1] || '',
-            phone: values[2] || null,
-            company_id: profile.company_id
-          };
-          candidates.push(candidate);
-        }
-      }
-
-      console.log(`Parsed ${candidates.length} candidates from CSV.`);
-
-      // Prepare payload for production n8n webhook
-      const webhookPayload = {
-        action: 'bulk_create_candidates',
-        candidates: candidates,
-        company_id: profile.company_id,
-        admin_user_id: profile.id,
-        company_name: company.name,
+      console.log('Uploading CSV with admin details:', {
+        adminUserId: profile.id,
+        companyId: profile.company_id,
+        companyName: company.name,
         industry: company.industry,
-        filename: file.name,
-        timestamp: new Date().toISOString()
-      };
-
-      console.log('Sending to production n8n webhook:', JSON.stringify(webhookPayload, null, 2));
-
-      // Send to production n8n webhook for user creation
-      const response = await fetch('https://n8n.erudites.in/webhook-test/usercreation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Admin-ID': profile.id,
-          'X-Company-ID': profile.company_id,
-          'X-Timestamp': new Date().toISOString(),
-        },
-        body: JSON.stringify(webhookPayload),
+        filename: file.name
       });
 
-      console.log('Production webhook response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Production webhook failed:', errorText);
-        throw new Error(`Production webhook failed: ${response.status} - ${errorText}`);
-      }
+      // Use the existing API route which will handle the webhook call
+      const response = await fetch('/api/n8n/csv-upload', {
+        method: 'POST',
+        body: formData, // Send as FormData for binary upload
+      });
 
       const result = await response.json();
-      console.log('Production webhook response:', result);
+      console.log('Upload response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Upload failed');
+      }
 
       toast({
         title: "Upload Started",
-        description: `Processing ${candidates.length} candidates. Questions will be generated automatically.`,
+        description: `Processing ${result.candidates_count || 'multiple'} candidates. Questions will be generated automatically.`,
       });
 
       setFile(null);

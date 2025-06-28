@@ -274,31 +274,25 @@ const CandidateDashboard = () => {
 
       console.log('Submitting comprehensive test data to production n8n webhook:', submissionData);
 
-      // Send to production n8n webhook for test evaluation
-      const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
+      // Create API route call instead of direct webhook call
+      const response = await fetch('/api/n8n/submit-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Candidate-ID': candidateId,
-          'X-Company-ID': candidate.company_id,
-          'X-User-ID': user.id,
-          'X-Submission-Time': new Date().toISOString(),
-          'X-Test-Status': 'completed',
         },
         body: JSON.stringify(submissionData),
       });
 
-      console.log('Production webhook response status:', webhookResponse.status);
+      console.log('API response status:', response.status);
 
-      if (!webhookResponse.ok) {
-        const errorText = await webhookResponse.text();
-        console.error('Production webhook response error:', errorText);
-        throw new Error(`Failed to submit test for evaluation: ${webhookResponse.status} ${webhookResponse.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API response error:', errorText);
+        throw new Error(`Failed to submit test for evaluation: ${response.status} ${errorText}`);
       }
 
-      const webhookResult = await webhookResponse.json();
-      console.log('Production webhook response:', webhookResult);
+      const result = await response.json();
+      console.log('API response:', result);
 
       // Update candidate status in database
       await supabase
