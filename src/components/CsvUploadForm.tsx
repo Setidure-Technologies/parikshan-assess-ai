@@ -80,7 +80,6 @@ const CsvUploadForm = () => {
         filename: file.name
       });
 
-      // Use the existing API route which will handle the webhook call
       const response = await fetch('/api/n8n/csv-upload', {
         method: 'POST',
         body: formData, // Send as FormData for binary upload
@@ -207,15 +206,12 @@ const CsvUploadForm = () => {
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <h4 className="text-sm font-medium text-blue-900 mb-2">What happens next:</h4>
           <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>CSV file processed with admin and company details</li>
+            <li>CSV file uploaded with admin and company details</li>
             <li>Candidates are created from your CSV</li>
             <li>AI generates personalized questions for each candidate</li>
             <li>Test credentials are automatically sent to candidates</li>
             <li>Candidates can take their assessments immediately</li>
           </ol>
-          <div className="mt-2 p-2 bg-green-100 rounded text-xs text-green-800">
-            <strong>Production Webhook:</strong> https://n8n.erudites.in/webhook-test/usercreation
-          </div>
         </div>
       </CardContent>
     </Card>

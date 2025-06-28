@@ -229,7 +229,7 @@ const CandidateDashboard = () => {
         return total + (session.total_time_seconds || 0);
       }, 0) || 0;
 
-      // Prepare comprehensive submission data for production webhook
+      // Prepare comprehensive submission data
       const submissionData = {
         // Candidate Information
         candidate_id: candidateId,
@@ -272,27 +272,27 @@ const CandidateDashboard = () => {
         }))
       };
 
-      console.log('Submitting comprehensive test data to production n8n webhook:', submissionData);
+      console.log('Submitting comprehensive test data to n8n:', submissionData);
 
-      // Create API route call instead of direct webhook call
-      const response = await fetch('/api/n8n/submit-test', {
+      // Send to n8n webhook with proper headers
+      const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Candidate-ID': candidateId,
+          'X-Company-ID': candidate.company_id,
+          'X-User-ID': user.id,
+          'X-Submission-Time': new Date().toISOString(),
         },
         body: JSON.stringify(submissionData),
       });
 
-      console.log('API response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API response error:', errorText);
-        throw new Error(`Failed to submit test for evaluation: ${response.status} ${errorText}`);
+      if (!webhookResponse.ok) {
+        const errorText = await webhookResponse.text();
+        console.error('Webhook response error:', errorText);
+        throw new Error(`Failed to submit test for evaluation: ${webhookResponse.status} ${webhookResponse.statusText}`);
       }
-
-      const result = await response.json();
-      console.log('API response:', result);
 
       // Update candidate status in database
       await supabase
@@ -308,10 +308,8 @@ const CandidateDashboard = () => {
         description: "Your test has been submitted for evaluation. You will be notified of the results.",
       });
 
-      // Refresh the page after a short delay to show updated status
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      // Refresh the page to show updated status
+      window.location.reload();
 
     } catch (error: any) {
       console.error('Error submitting final test:', error);
@@ -362,9 +360,6 @@ const CandidateDashboard = () => {
               >
                 {isSubmittingFinal ? "Submitting..." : "Submit Final Test"}
               </Button>
-              <div className="mt-3 p-2 bg-blue-100 rounded text-xs text-blue-800">
-                <strong>Production Webhook:</strong> https://n8n.erudites.in/webhook-test/testevaluation
-              </div>
             </CardContent>
           </Card>
         )}

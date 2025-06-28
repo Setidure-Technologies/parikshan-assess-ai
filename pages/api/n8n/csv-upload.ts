@@ -16,8 +16,7 @@ export default async function handler(req: any, res: any) {
   try {
     console.log('CSV upload request received, processing with formidable.');
     
-    // Updated production webhook URL
-    const webhookUrl = 'https://n8n.erudites.in/webhook-test/usercreation';
+    const webhookUrl = 'https://n8n.erudites.in/webhook-test/476f1370-870d-459e-8be0-8ab3d86ff69a';
     
     if (!webhookUrl) {
       console.error('N8N webhook URL not configured');
@@ -98,39 +97,34 @@ export default async function handler(req: any, res: any) {
       timestamp: new Date().toISOString()
     };
 
-    console.log('Sending to production n8n webhook:', JSON.stringify(webhookPayload, null, 2));
+    console.log('Sending to n8n webhook:', JSON.stringify(webhookPayload, null, 2));
 
-    // Send to production n8n webhook
+    // Send to n8n webhook
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Admin-ID': adminUserId,
-        'X-Company-ID': companyId,
-        'X-Timestamp': new Date().toISOString(),
       },
       body: JSON.stringify(webhookPayload),
     });
 
-    console.log('Production webhook response status:', response.status);
+    console.log('N8N response status:', response.status);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Production webhook failed:', errorText);
-      throw new Error(`Production webhook failed: ${response.status} - ${errorText}`);
+      console.error('N8N webhook failed:', errorText);
+      throw new Error(`N8N webhook failed: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json();
-    console.log('Production webhook response:', result);
+    console.log('N8N response:', result);
 
     res.status(202).json({ 
       success: true, 
       message: 'CSV upload initiated successfully',
       candidates_count: candidates.length,
       admin_user_id: adminUserId,
-      company_name: companyName,
-      webhook_url: webhookUrl
+      company_name: companyName
     });
   } catch (error: any) {
     console.error('Error in csv-upload API:', error);
