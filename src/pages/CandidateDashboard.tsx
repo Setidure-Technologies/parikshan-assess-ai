@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,13 +9,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
+import { Tables } from '@/integrations/supabase/types';
 
-interface Section {
-  id: string;
-  name: string;
-  description: string;
-  time_limit_minutes: number;
-  display_order: number;
+// Use the actual database type and extend it with our computed properties
+interface Section extends Tables<'sections'> {
   question_count: number;
   completed_answers: number;
 }
