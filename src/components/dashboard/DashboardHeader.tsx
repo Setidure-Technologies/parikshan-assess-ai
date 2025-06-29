@@ -5,9 +5,10 @@ import { Link } from "react-router-dom";
 
 interface DashboardHeaderProps {
   onLogout: () => void;
+  userName: string | null;
 }
 
-const DashboardHeader = ({ onLogout }: DashboardHeaderProps) => {
+const DashboardHeader = ({ onLogout, userName }: DashboardHeaderProps) => {
   return (
     <header className="bg-white shadow-sm border-b">
       <div className="container mx-auto px-4 py-4">
@@ -17,7 +18,7 @@ const DashboardHeader = ({ onLogout }: DashboardHeaderProps) => {
             <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
           </Link>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Welcome, Administrator</span>
+            <span className="text-sm text-gray-600">Welcome, {userName || 'Administrator'}</span>
             <Button variant="outline" size="sm" onClick={onLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Logout

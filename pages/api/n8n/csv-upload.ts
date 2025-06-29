@@ -16,7 +16,7 @@ export default async function handler(req: any, res: any) {
   try {
     console.log('CSV upload request received, processing with formidable.');
     
-    const webhookUrl = 'https://n8n.erudites.in/webhook-test/476f1370-870d-459e-8be0-8ab3d86ff69a';
+    const webhookUrl = 'https://n8n.erudites.in/webhook-test/usercreation';
     
     if (!webhookUrl) {
       console.error('N8N webhook URL not configured');
@@ -69,7 +69,7 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'CSV must have a header and at least one data row.' });
     }
     
-    const candidates = [];
+    const candidates: { full_name: string; email: string; phone: string | null; company_id: string; }[] = [];
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(',').map((v: string) => v.trim());
       if (values.length >= 2) { // At least name and email

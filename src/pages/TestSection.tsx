@@ -281,6 +281,22 @@ const TestSection = () => {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     await handleSave();
+
+    try {
+      await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          candidate_id: candidateId,
+          section_id: sectionId,
+          answers: answers,
+        }),
+      });
+    } catch (error) {
+      console.error('Error calling test evaluation webhook:', error);
+    }
     
     setTimeout(() => {
       toast({
