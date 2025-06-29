@@ -1,19 +1,22 @@
 
+// Simplified webhook configuration
+const WEBHOOK_BASE_URL = 'https://n8n.erudites.in';
+
 export const WEBHOOKS = {
   PROD: {
-    USER_CREATION: 'https://n8n.erudites.in/webhook/usercreation',
-    TEST_EVALUATION: 'https://n8n.erudites.in/webhook/testevaluation',
+    USER_CREATION: `${WEBHOOK_BASE_URL}/webhook/usercreation`,
+    TEST_EVALUATION: `${WEBHOOK_BASE_URL}/webhook/testevaluation`,
   },
   TEST: {
-    USER_CREATION: 'https://n8n.erudites.in/webhook-test/usercreation',
-    TEST_EVALUATION: 'https://n8n.erudites.in/webhook-test/testevaluation',
+    USER_CREATION: `${WEBHOOK_BASE_URL}/webhook-test/usercreation`,
+    TEST_EVALUATION: `${WEBHOOK_BASE_URL}/webhook-test/testevaluation`,
   },
 };
 
 export const CURRENT_ENV = process.env.NODE_ENV === 'production' ? 'PROD' : 'TEST';
 export const ACTIVE_WEBHOOKS = WEBHOOKS[CURRENT_ENV];
 
-console.log('Webhook configuration loaded:', {
-  CURRENT_ENV,
-  ACTIVE_WEBHOOKS
+console.log('Webhook config:', {
+  ENV: CURRENT_ENV,
+  USER_CREATION_URL: ACTIVE_WEBHOOKS.USER_CREATION
 });

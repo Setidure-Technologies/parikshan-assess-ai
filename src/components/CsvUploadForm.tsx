@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,11 +22,11 @@ const CsvUploadForm = () => {
     if (selectedFile && selectedFile.type === 'text/csv') {
       setFile(selectedFile);
       
-      // Show preview of CSV
+      // Show preview
       const reader = new FileReader();
       reader.onload = (event) => {
         const csv = event.target?.result as string;
-        const lines = csv.split('\n').slice(0, 4); // Show first 4 lines
+        const lines = csv.split('\n').slice(0, 4);
         setPreview(lines);
       };
       reader.readAsText(selectedFile);
@@ -62,8 +63,9 @@ const CsvUploadForm = () => {
     }
 
     setLoading(true);
+    
     try {
-      console.log('Preparing CSV upload...', {
+      console.log('Starting CSV upload...', {
         fileName: file.name,
         fileSize: file.size,
         adminUserId: profile.id,
@@ -71,7 +73,6 @@ const CsvUploadForm = () => {
         companyName: company.name
       });
 
-      // Create FormData for binary file upload
       const formData = new FormData();
       formData.append('csvFile', file);
       formData.append('adminUserId', profile.id);
@@ -80,27 +81,26 @@ const CsvUploadForm = () => {
       formData.append('industry', company.industry || '');
       formData.append('filename', file.name);
 
-      console.log('Uploading CSV file to API...');
+      console.log('Uploading to API...');
 
-      const response = await fetch('/api/n8n/csv-upload', {
+      const response = await fetch('/api/csv-upload', {
         method: 'POST',
         body: formData,
       });
 
-      console.log('API response status:', response.status);
+      console.log('API Response Status:', response.status);
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('API response data:', result);
+      console.log('Success:', result);
 
       toast({
-        title: "Upload Success",
-        description: `CSV processed successfully. Candidates will be processed.`,
+        title: "Upload Successful",
+        description: "CSV processed and candidates will be created shortly",
       });
 
       // Reset form
@@ -109,16 +109,16 @@ const CsvUploadForm = () => {
       const fileInput = document.getElementById('csvFile') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
-      // Refresh page after delay to show new candidates
+      // Refresh after delay
       setTimeout(() => {
         window.location.reload();
       }, 2000);
       
     } catch (error: any) {
-      console.error('Upload error details:', error);
+      console.error('Upload failed:', error);
       toast({
         title: "Upload Failed",
-        description: error.message || "Failed to upload CSV file. Please check console for details.",
+        description: error.message || "Failed to process CSV file",
         variant: "destructive",
       });
     } finally {
@@ -159,27 +159,17 @@ const CsvUploadForm = () => {
               className="cursor-pointer"
             />
             <p className="text-sm text-gray-500 mt-1">
-              CSV format: full_name, email, phone (optional)
+              Format: full_name, email, phone (optional)
             </p>
           </div>
 
           {profile && company && (
-            <div className="grid grid-cols-2 gap-4 p-3 bg-blue-50 rounded-lg">
+            <div className="grid grid-cols-2 gap-4 p-3 bg-blue-50 rounded-lg text-sm">
               <div>
-                <p className="text-xs text-blue-600 font-medium">Admin ID</p>
-                <p className="text-sm text-blue-800">{profile.id}</p>
+                <p className="font-medium text-blue-800">Admin: {profile.id}</p>
               </div>
               <div>
-                <p className="text-xs text-blue-600 font-medium">Company</p>
-                <p className="text-sm text-blue-800">{company.name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-blue-600 font-medium">Industry</p>
-                <p className="text-sm text-blue-800">{company.industry}</p>
-              </div>
-              <div>
-                <p className="text-xs text-blue-600 font-medium">Company ID</p>
-                <p className="text-sm text-blue-800">{profile.company_id}</p>
+                <p className="font-medium text-blue-800">Company: {company.name}</p>
               </div>
             </div>
           )}
@@ -193,7 +183,7 @@ const CsvUploadForm = () => {
               <div className="text-xs font-mono space-y-1">
                 {preview.map((line, index) => (
                   <div key={index} className={index === 0 ? 'font-bold' : ''}>
-                    {line.substring(0, 100)}{line.length > 100 ? '...' : ''}
+                    {line.substring(0, 80)}{line.length > 80 ? '...' : ''}
                   </div>
                 ))}
               </div>
@@ -203,20 +193,19 @@ const CsvUploadForm = () => {
           <Button 
             type="submit" 
             disabled={!file || loading}
-            className="w-full bg-cyan-500 hover:bg-cyan-600"
+            className="w-full"
           >
             {loading ? 'Processing...' : 'Upload & Generate Tests'}
           </Button>
         </form>
 
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">What happens next:</h4>
+          <h4 className="text-sm font-medium text-blue-900 mb-2">Process:</h4>
           <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>CSV file uploaded as BINARY with admin and company details</li>
-            <li>Candidates are created from your CSV</li>
-            <li>AI generates personalized questions for each candidate</li>
-            <li>Test credentials are automatically sent to candidates</li>
-            <li>Candidates can take their assessments immediately</li>
+            <li>CSV uploaded with company details</li>
+            <li>Candidates created from CSV data</li>
+            <li>AI generates personalized questions</li>
+            <li>Test credentials sent to candidates</li>
           </ol>
         </div>
       </CardContent>
