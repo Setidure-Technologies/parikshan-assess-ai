@@ -76,16 +76,18 @@ const CsvUploadForm = () => {
         fileSize: file.size
       });
 
-      // Send directly to n8n webhook
+      // Send directly to n8n webhook with proper CORS handling
       const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
         method: 'POST',
         body: formData,
         headers: {
           'User-Agent': 'Parikshan-AI/1.0',
         },
+        mode: 'cors', // Explicitly set CORS mode
       });
 
       console.log('N8N Response Status:', response.status);
+      console.log('N8N Response Headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -108,9 +110,18 @@ const CsvUploadForm = () => {
 
     } catch (error: any) {
       console.error('CSV Upload Error:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = "Failed to upload CSV file";
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = "Network error - please check your connection and try again";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Upload Failed",
-        description: error.message || "Failed to upload CSV file",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
