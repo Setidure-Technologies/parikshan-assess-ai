@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,21 +71,20 @@ const CsvUploadForm = () => {
         companyName: company.name
       });
 
-      // Create FormData for binary file upload - DIRECT BINARY SEND
+      // Create FormData for binary file upload
       const formData = new FormData();
-      formData.append('csvFile', file); // Binary file directly
+      formData.append('csvFile', file);
       formData.append('adminUserId', profile.id);
       formData.append('companyId', profile.company_id);
       formData.append('companyName', company.name);
       formData.append('industry', company.industry || '');
       formData.append('filename', file.name);
 
-      console.log('Uploading CSV file to API - BINARY UPLOAD...');
+      console.log('Uploading CSV file to API...');
 
       const response = await fetch('/api/n8n/csv-upload', {
         method: 'POST',
         body: formData,
-        // NO HEADERS - let browser set Content-Type with boundary for multipart/form-data
       });
 
       console.log('API response status:', response.status);
@@ -102,7 +100,7 @@ const CsvUploadForm = () => {
 
       toast({
         title: "Upload Success",
-        description: `CSV processed successfully. ${result.candidates_count || 'Multiple'} candidates will be processed.`,
+        description: `CSV processed successfully. Candidates will be processed.`,
       });
 
       // Reset form
