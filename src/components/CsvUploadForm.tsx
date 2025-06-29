@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,16 +64,16 @@ const CsvUploadForm = () => {
 
     setLoading(true);
     try {
-      // Create FormData for binary file upload
+      // Create FormData for binary file upload (reverted format)
       const formData = new FormData();
-      formData.append('csvFile', file);
+      formData.append('csvFile', file); // File as binary
       formData.append('adminUserId', profile.id);
       formData.append('companyId', profile.company_id);
       formData.append('companyName', company.name);
       formData.append('industry', company.industry);
       formData.append('filename', file.name);
 
-      console.log('Uploading CSV with admin details:', {
+      console.log('Uploading CSV with binary FormData:', {
         adminUserId: profile.id,
         companyId: profile.company_id,
         companyName: company.name,
@@ -82,7 +83,7 @@ const CsvUploadForm = () => {
 
       const response = await fetch('/api/n8n/csv-upload', {
         method: 'POST',
-        body: formData, // Send as FormData for binary upload
+        body: formData, // Send as FormData (binary)
       });
 
       const result = await response.json();
@@ -206,7 +207,7 @@ const CsvUploadForm = () => {
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <h4 className="text-sm font-medium text-blue-900 mb-2">What happens next:</h4>
           <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>CSV file uploaded with admin and company details</li>
+            <li>CSV file uploaded as binary with admin and company details</li>
             <li>Candidates are created from your CSV</li>
             <li>AI generates personalized questions for each candidate</li>
             <li>Test credentials are automatically sent to candidates</li>

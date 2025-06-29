@@ -58,24 +58,28 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Use native FormData for fetch
-    const proxyFormData = new FormData();
-    if (adminUserId) proxyFormData.append('adminUserId', adminUserId);
-    if (companyId) proxyFormData.append('companyId', companyId);
-    if (companyName) proxyFormData.append('companyName', companyName);
-    if (industry) proxyFormData.append('industry', industry);
-    if (filename) proxyFormData.append('filename', filename);
+    // Create FormData for binary file upload (reverted to original working format)
+    const formData = new FormData();
+    
+    // Add metadata fields
+    if (adminUserId) formData.append('adminUserId', adminUserId);
+    if (companyId) formData.append('companyId', companyId);
+    if (companyName) formData.append('companyName', companyName);
+    if (industry) formData.append('industry', industry);
+    if (filename) formData.append('filename', filename);
+    formData.append('batch_id', `BATCH_${Date.now()}`);
 
+    // Add CSV file as binary
     const fileContent = fs.readFileSync(csvFile.filepath);
     const fileBlob = new Blob([fileContent], { type: csvFile.mimetype || 'text/csv' });
+    formData.append('file', fileBlob, csvFile.originalFilename || 'upload.csv');
 
-    proxyFormData.append('csvFile', fileBlob, csvFile.originalFilename || 'upload.csv');
+    console.log('Sending binary CSV with FormData to webhook:', webhookUrl);
 
-    // Send to n8n webhook
+    // Send to n8n webhook (no custom headers - let browser set multipart/form-data)
     const response = await fetch(webhookUrl, {
       method: 'POST',
-      body: proxyFormData,
-      // Let fetch set the headers automatically for multipart/form-data
+      body: formData,
     });
 
     console.log('N8N response status:', response.status);
@@ -92,7 +96,7 @@ export default async function handler(req: any, res: any) {
     res.status(202).json({ 
       success: true, 
       message: 'CSV upload initiated successfully',
-      candidates_count: result.candidates_count, // Assuming n8n returns this
+      candidates_count: result.candidates_count,
       admin_user_id: adminUserId,
       company_name: companyName
     });

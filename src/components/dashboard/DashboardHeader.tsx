@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Brain, LogOut } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface DashboardHeaderProps {
   onLogout: () => void;
@@ -18,9 +18,14 @@ const DashboardHeader = ({ onLogout, userName }: DashboardHeaderProps) => {
             <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
           </Link>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Welcome, {userName || 'Administrator'}</span>
-            <Button variant="outline" size="sm" onClick={onLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
+            <span className="text-sm text-gray-600">Welcome, {userName || 'User'}</span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onLogout}
+              className="flex items-center gap-2 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+            >
+              <LogOut className="w-4 h-4" />
               Logout
             </Button>
           </div>

@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
 import { Tables } from '@/integrations/supabase/types';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
 
 // Use the actual database type and extend it with our computed properties
 interface Section extends Tables<'sections'> {
@@ -19,13 +20,26 @@ interface Section extends Tables<'sections'> {
 
 const CandidateDashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
   const [candidateId, setCandidateId] = useState<string | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
   const [testSessions, setTestSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmittingFinal, setIsSubmittingFinal] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      localStorage.clear();
+      sessionStorage.clear();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force navigation even if signOut fails
+      navigate('/login');
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -331,168 +345,175 @@ const CandidateDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 p-4">
-      <div className="container mx-auto max-w-6xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Candidate Dashboard</h1>
-          <p className="text-gray-600">Welcome back! Here are your available assessments.</p>
-        </div>
+    <div className="min-h-screen bg-stone-50">
+      <DashboardHeader 
+        onLogout={handleLogout} 
+        userName={user?.user_metadata?.full_name || user?.email} 
+      />
+      
+      <div className="p-4">
+        <div className="container mx-auto max-w-6xl">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Candidate Dashboard</h1>
+            <p className="text-gray-600">Welcome back! Here are your available assessments.</p>
+          </div>
 
-        {/* Final Submission Button */}
-        {areAllSectionsCompleted() && (
-          <Card className="mb-6 border-green-200 bg-green-50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-700">
-                <CheckCircle className="h-5 w-5" />
-                All Sections Completed!
-              </CardTitle>
-              <CardDescription>
-                You have completed all test sections. Click below to submit your final test for evaluation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={handleFinalSubmission}
-                disabled={isSubmittingFinal}
-                className="bg-green-600 hover:bg-green-700"
-                size="lg"
-              >
-                {isSubmittingFinal ? "Submitting..." : "Submit Final Test"}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Profile Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-cyan-600">
-                <User className="h-5 w-5" />
-                Profile
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={() => navigate('/candidate-profile')} 
-                variant="outline" 
-                className="w-full"
-              >
-                Edit Profile
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Assessment Sections */}
-          {sections.map((section) => {
-            const progress = getSectionProgress(section);
-            const status = getSectionStatus(section);
-            
-            return (
-              <Card key={section.id} className="col-span-full lg:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-cyan-600">
-                    <Play className="h-5 w-5" />
-                    {section.name}
-                  </CardTitle>
-                  <CardDescription>
-                    {section.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      {section.time_limit_minutes} minutes
-                    </span>
-                    <span>{section.completed_answers} of {section.question_count} questions</span>
-                  </div>
-                  
-                  <Progress value={progress} className="h-2" />
-                  
-                  <div className="flex items-center justify-between">
-                    <Badge variant={
-                      status === 'completed' ? 'default' :
-                      status === 'in_progress' ? 'secondary' :
-                      status === 'not_started' ? 'outline' : 'destructive'
-                    }>
-                      {status === 'completed' ? 'Completed' :
-                       status === 'in_progress' ? 'In Progress' :
-                       status === 'not_started' ? 'Not Started' : 'Not Available'}
-                    </Badge>
-                    
-                    <div className="flex gap-2">
-                      {status === 'completed' && canRetrySection(section.id) && (
-                        <Button 
-                          onClick={() => handleRetryTest(section.id)} 
-                          variant="outline" 
-                          size="sm"
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Retry
-                        </Button>
-                      )}
-                      {(status === 'not_started' || status === 'in_progress') && (
-                        <Button 
-                          onClick={() => handleStartTest(section.id)} 
-                          className="bg-cyan-500 hover:bg-cyan-600"
-                          size="sm"
-                        >
-                          <Play className="h-4 w-4 mr-2" />
-                          {status === 'not_started' ? 'Start' : 'Continue'}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-
-          {sections.length === 0 && (
-            <Card className="col-span-full">
-              <CardContent className="text-center py-8">
-                <p className="text-gray-500">No assessments are available yet. Please wait for your tests to be generated.</p>
+          {/* Final Submission Button */}
+          {areAllSectionsCompleted() && (
+            <Card className="mb-6 border-green-200 bg-green-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-green-700">
+                  <CheckCircle className="h-5 w-5" />
+                  All Sections Completed!
+                </CardTitle>
+                <CardDescription>
+                  You have completed all test sections. Click below to submit your final test for evaluation.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={handleFinalSubmission}
+                  disabled={isSubmittingFinal}
+                  className="bg-green-600 hover:bg-green-700"
+                  size="lg"
+                >
+                  {isSubmittingFinal ? "Submitting..." : "Submit Final Test"}
+                </Button>
               </CardContent>
             </Card>
           )}
 
-          {/* Test History */}
-          <Card className="col-span-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-cyan-600">
-                <FileText className="h-5 w-5" />
-                Test History
-              </CardTitle>
-              <CardDescription>
-                Your previous test attempts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {testSessions.length > 0 ? (
-                <div className="space-y-2">
-                  {testSessions.map((session, index) => {
-                    const section = sections.find(s => s.id === session.section_id);
-                    return (
-                      <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                        <div>
-                          <span className="font-medium">{section?.name || 'Unknown Section'} - Attempt {session.attempt || index + 1}</span>
-                          <p className="text-sm text-gray-500">
-                            {session.started_at ? new Date(session.started_at).toLocaleDateString() : 'Not started'}
-                          </p>
-                        </div>
-                        <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
-                          {session.status || 'In Progress'}
-                        </Badge>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Profile Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-cyan-600">
+                  <User className="h-5 w-5" />
+                  Profile
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={() => navigate('/candidate-profile')} 
+                  variant="outline" 
+                  className="w-full"
+                >
+                  Edit Profile
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Assessment Sections */}
+            {sections.map((section) => {
+              const progress = getSectionProgress(section);
+              const status = getSectionStatus(section);
+              
+              return (
+                <Card key={section.id} className="col-span-full lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-cyan-600">
+                      <Play className="h-5 w-5" />
+                      {section.name}
+                    </CardTitle>
+                    <CardDescription>
+                      {section.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {section.time_limit_minutes} minutes
+                      </span>
+                      <span>{section.completed_answers} of {section.question_count} questions</span>
+                    </div>
+                    
+                    <Progress value={progress} className="h-2" />
+                    
+                    <div className="flex items-center justify-between">
+                      <Badge variant={
+                        status === 'completed' ? 'default' :
+                        status === 'in_progress' ? 'secondary' :
+                        status === 'not_started' ? 'outline' : 'destructive'
+                      }>
+                        {status === 'completed' ? 'Completed' :
+                         status === 'in_progress' ? 'In Progress' :
+                         status === 'not_started' ? 'Not Started' : 'Not Available'}
+                      </Badge>
+                      
+                      <div className="flex gap-2">
+                        {status === 'completed' && canRetrySection(section.id) && (
+                          <Button 
+                            onClick={() => handleRetryTest(section.id)} 
+                            variant="outline" 
+                            size="sm"
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Retry
+                          </Button>
+                        )}
+                        {(status === 'not_started' || status === 'in_progress') && (
+                          <Button 
+                            onClick={() => handleStartTest(section.id)} 
+                            className="bg-cyan-500 hover:bg-cyan-600"
+                            size="sm"
+                          >
+                            <Play className="h-4 w-4 mr-2" />
+                            {status === 'not_started' ? 'Start' : 'Continue'}
+                          </Button>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-gray-500">No test sessions yet</p>
-              )}
-            </CardContent>
-          </Card>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+
+            {sections.length === 0 && (
+              <Card className="col-span-full">
+                <CardContent className="text-center py-8">
+                  <p className="text-gray-500">No assessments are available yet. Please wait for your tests to be generated.</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Test History */}
+            <Card className="col-span-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-cyan-600">
+                  <FileText className="h-5 w-5" />
+                  Test History
+                </CardTitle>
+                <CardDescription>
+                  Your previous test attempts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {testSessions.length > 0 ? (
+                  <div className="space-y-2">
+                    {testSessions.map((session, index) => {
+                      const section = sections.find(s => s.id === session.section_id);
+                      return (
+                        <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                          <div>
+                            <span className="font-medium">{section?.name || 'Unknown Section'} - Attempt {session.attempt || index + 1}</span>
+                            <p className="text-sm text-gray-500">
+                              {session.started_at ? new Date(session.started_at).toLocaleDateString() : 'Not started'}
+                            </p>
+                          </div>
+                          <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
+                            {session.status || 'In Progress'}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">No test sessions yet</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
