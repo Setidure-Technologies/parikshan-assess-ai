@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,56 +63,61 @@ const CsvUploadForm = () => {
 
     setLoading(true);
     try {
-      // Create FormData for binary file upload (reverted format)
+      console.log('Preparing CSV upload...', {
+        fileName: file.name,
+        fileSize: file.size,
+        adminUserId: profile.id,
+        companyId: profile.company_id,
+        companyName: company.name
+      });
+
+      // Create FormData for binary file upload
       const formData = new FormData();
-      formData.append('csvFile', file); // File as binary
+      formData.append('csvFile', file);
       formData.append('adminUserId', profile.id);
       formData.append('companyId', profile.company_id);
       formData.append('companyName', company.name);
       formData.append('industry', company.industry);
       formData.append('filename', file.name);
 
-      console.log('Uploading CSV with binary FormData:', {
-        adminUserId: profile.id,
-        companyId: profile.company_id,
-        companyName: company.name,
-        industry: company.industry,
-        filename: file.name
-      });
+      console.log('Uploading CSV file to API...');
 
       const response = await fetch('/api/n8n/csv-upload', {
         method: 'POST',
-        body: formData, // Send as FormData (binary)
+        body: formData,
+        // No headers - let browser set Content-Type with boundary
       });
 
+      console.log('API response status:', response.status);
+      
       const result = await response.json();
-      console.log('Upload response:', result);
+      console.log('API response data:', result);
 
       if (!response.ok) {
-        throw new Error(result.error || 'Upload failed');
+        throw new Error(result.error || `HTTP ${response.status}: Upload failed`);
       }
 
       toast({
-        title: "Upload Started",
-        description: `Processing ${result.candidates_count || 'multiple'} candidates. Questions will be generated automatically.`,
+        title: "Upload Success",
+        description: `CSV processed successfully. ${result.candidates_count || 'Multiple'} candidates will be processed.`,
       });
 
+      // Reset form
       setFile(null);
       setPreview([]);
-      // Reset the file input
       const fileInput = document.getElementById('csvFile') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
-      // Refresh the page after a short delay to show new candidates
+      // Refresh page after delay to show new candidates
       setTimeout(() => {
         window.location.reload();
       }, 2000);
       
     } catch (error: any) {
-      console.error('Upload error:', error);
+      console.error('Upload error details:', error);
       toast({
         title: "Upload Failed",
-        description: error.message || "Failed to upload CSV file",
+        description: error.message || "Failed to upload CSV file. Please check console for details.",
         variant: "destructive",
       });
     } finally {

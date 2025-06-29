@@ -12,3 +12,8 @@ export const WEBHOOKS = {
 
 export const CURRENT_ENV = process.env.NODE_ENV === 'production' ? 'PROD' : 'TEST';
 export const ACTIVE_WEBHOOKS = WEBHOOKS[CURRENT_ENV];
+
+console.log('Webhook configuration loaded:', {
+  CURRENT_ENV,
+  ACTIVE_WEBHOOKS
+});
