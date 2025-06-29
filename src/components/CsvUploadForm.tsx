@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
-import { ACTIVE_WEBHOOKS, makeWebhookRequest } from '@/config/webhooks';
+import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
+import { useCompany } from '@/hooks/useCompany';
 
 const CsvUploadForm = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -16,6 +17,7 @@ const CsvUploadForm = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { profile } = useProfile();
+  const { company } = useCompany(profile);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -41,10 +43,10 @@ const CsvUploadForm = () => {
       return;
     }
 
-    if (!user || !profile) {
+    if (!user || !profile || !company) {
       toast({
         title: "Authentication required",
-        description: "Please log in to upload CSV files",
+        description: "Please log in and ensure company details are available",
         variant: "destructive",
       });
       return;
@@ -53,54 +55,84 @@ const CsvUploadForm = () => {
     setLoading(true);
     try {
       console.log('Starting CSV upload process...');
+      console.log('Company details:', {
+        companyId: company.id,
+        companyName: company.name,
+        industry: company.industry,
+        adminUserId: user.id
+      });
       
-      // Create FormData for n8n webhook
+      // Create FormData for n8n webhook with binary file
       const formData = new FormData();
       
-      // Add required fields for n8n
+      // Add all required fields for n8n workflow
       formData.append('adminUserId', user.id);
-      formData.append('companyId', profile.company_id || '');
-      formData.append('companyName', ''); // Will be filled by n8n from company_id
-      formData.append('industry', '');    // Will be filled by n8n from company_id
+      formData.append('companyId', company.id);
+      formData.append('companyName', company.name);
+      formData.append('industry', company.industry);
       formData.append('filename', file.name);
       formData.append('batch_id', `BATCH_${Date.now()}`);
+      formData.append('action', 'csv_upload');
       
-      // Add the CSV file
-      formData.append('csvFile', file);
+      // Add the CSV file as binary data - this is crucial for n8n to receive it properly
+      formData.append('file', file, file.name);
 
-      console.log('Form data prepared:', {
+      console.log('FormData prepared with binary file:', {
         adminUserId: user.id,
-        companyId: profile.company_id,
+        companyId: company.id,
+        companyName: company.name,
+        industry: company.industry,
         filename: file.name,
-        fileSize: file.size
+        fileSize: file.size,
+        fileType: file.type
       });
 
-      // Use the centralized webhook request helper
-      const response = await makeWebhookRequest(ACTIVE_WEBHOOKS.USER_CREATION, formData);
+      // Send POST request directly to n8n webhook
+      console.log('Sending POST request to:', ACTIVE_WEBHOOKS.USER_CREATION);
+      
+      const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
+        method: 'POST', // Explicitly ensure POST method
+        body: formData, // Send FormData with binary file
+        headers: {
+          'User-Agent': 'Parikshan-AI/1.0',
+          // Don't set Content-Type - let browser set it with boundary for FormData
+        },
+        mode: 'cors',
+      });
+
+      console.log('Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('N8N Error:', response.status, errorText);
-        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+        console.error('N8N webhook error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
+        });
+        throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
+      // Handle successful response
       const result = await response.text();
-      console.log('N8N Success Response:', result);
+      console.log('N8N webhook success:', result);
 
       toast({
         title: "Upload Started",
         description: "CSV file is being processed. Candidates will appear shortly.",
       });
 
+      // Reset form state
       setFile(null);
-      // Reset the file input
       const fileInput = document.getElementById('csvFile') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
     } catch (error: any) {
       console.error('CSV Upload Error:', error);
       
-      // Provide more specific error messages
       let errorMessage = "Failed to upload CSV file";
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         errorMessage = "Network error - please check your connection and try again";
@@ -127,6 +159,13 @@ const CsvUploadForm = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {company && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-600">
+              <strong>Company:</strong> {company.name} ({company.industry})
+            </p>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="csvFile">CSV File</Label>
@@ -143,7 +182,7 @@ const CsvUploadForm = () => {
           </div>
           <Button 
             type="submit" 
-            disabled={!file || loading}
+            disabled={!file || loading || !company}
             className="w-full bg-cyan-500 hover:bg-cyan-600"
           >
             {loading ? 'Uploading...' : 'Upload CSV'}
