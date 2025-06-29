@@ -6,11 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
+import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 
 const CsvUploadForm = () => {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { profile } = useProfile();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -36,55 +41,79 @@ const CsvUploadForm = () => {
       return;
     }
 
-    setLoading(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const csvContent = event.target?.result as string;
-        
-        try {
-          const response = await fetch('/api/n8n/csv-upload', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              csvContent,
-              filename: file.name,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error('Upload failed');
-          }
-
-          toast({
-            title: "Upload Started",
-            description: "CSV file is being processed. Candidates will appear shortly.",
-          });
-
-          setFile(null);
-          // Reset the file input
-          const fileInput = document.getElementById('csvFile') as HTMLInputElement;
-          if (fileInput) fileInput.value = '';
-        } catch (error) {
-          toast({
-            title: "Upload Failed",
-            description: "Failed to upload CSV file",
-            variant: "destructive",
-          });
-        } finally {
-          setLoading(false);
-        }
-      };
-      
-      reader.readAsText(file);
-    } catch (error) {
+    if (!user || !profile) {
       toast({
-        title: "Error",
-        description: "Failed to read file",
+        title: "Authentication required",
+        description: "Please log in to upload CSV files",
         variant: "destructive",
       });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      console.log('Starting CSV upload process...');
+      
+      // Create FormData for n8n webhook
+      const formData = new FormData();
+      
+      // Add required fields for n8n
+      formData.append('adminUserId', user.id);
+      formData.append('companyId', profile.company_id || '');
+      formData.append('companyName', ''); // Will be filled by n8n from company_id
+      formData.append('industry', '');    // Will be filled by n8n from company_id
+      formData.append('filename', file.name);
+      formData.append('batch_id', `BATCH_${Date.now()}`);
+      
+      // Add the CSV file
+      formData.append('csvFile', file);
+
+      console.log('Sending to n8n webhook:', ACTIVE_WEBHOOKS.USER_CREATION);
+      console.log('Form data prepared:', {
+        adminUserId: user.id,
+        companyId: profile.company_id,
+        filename: file.name,
+        fileSize: file.size
+      });
+
+      // Send directly to n8n webhook
+      const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'User-Agent': 'Parikshan-AI/1.0',
+        },
+      });
+
+      console.log('N8N Response Status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('N8N Error:', response.status, errorText);
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.text();
+      console.log('N8N Success Response:', result);
+
+      toast({
+        title: "Upload Started",
+        description: "CSV file is being processed. Candidates will appear shortly.",
+      });
+
+      setFile(null);
+      // Reset the file input
+      const fileInput = document.getElementById('csvFile') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
+    } catch (error: any) {
+      console.error('CSV Upload Error:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload CSV file",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
     }
   };
