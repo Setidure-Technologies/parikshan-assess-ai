@@ -1,6 +1,8 @@
 
+import { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import fs from 'fs';
+import { ACTIVE_WEBHOOKS } from '../../src/config/webhooks';
 
 // Disable Next.js body parser for file uploads
 export const config = {
@@ -9,7 +11,7 @@ export const config = {
   },
 };
 
-export default async function handler(req, res) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -17,11 +19,7 @@ export default async function handler(req, res) {
   try {
     console.log('CSV upload request received');
     
-    // Use environment-based webhook URL
-    const webhookUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://n8n.erudites.in/webhook/usercreation'
-      : 'https://n8n.erudites.in/webhook-test/usercreation';
-    
+    const webhookUrl = ACTIVE_WEBHOOKS.USER_CREATION;
     console.log('Using webhook URL:', webhookUrl);
 
     const form = formidable({
@@ -120,7 +118,7 @@ export default async function handler(req, res) {
       webhook_response: result
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('CSV Upload Error:', error);
     res.status(500).json({ 
       error: 'Upload failed',

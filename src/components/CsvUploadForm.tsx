@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,7 +80,7 @@ const CsvUploadForm = () => {
         filename: file.name
       });
 
-      const response = await fetch('/api/n8n/csv-upload', {
+      const response = await fetch('/api/csv-upload', {
         method: 'POST',
         body: formData, // Send as FormData for binary upload
       });

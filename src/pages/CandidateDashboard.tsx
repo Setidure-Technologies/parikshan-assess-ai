@@ -202,7 +202,7 @@ const CandidateDashboard = () => {
     setIsSubmittingFinal(true);
 
     try {
-      // Get comprehensive candidate and test data
+      // Get comprehensive candidate and test data with ALL metadata
       const { data: candidate, error: candidateError } = await supabase
         .from('candidates')
         .select(`
@@ -211,7 +211,9 @@ const CandidateDashboard = () => {
             id,
             name,
             email,
-            industry
+            industry,
+            created_at,
+            profile_data
           )
         `)
         .eq('id', candidateId)
@@ -219,7 +221,7 @@ const CandidateDashboard = () => {
 
       if (candidateError) throw candidateError;
 
-      // Get all answers with section details
+      // Get all answers with comprehensive section and question details
       const { data: allAnswers, error: answersError } = await supabase
         .from('answers')
         .select(`
@@ -227,67 +229,131 @@ const CandidateDashboard = () => {
           sections (
             id,
             name,
-            description
+            description,
+            time_limit_minutes,
+            instructions,
+            created_at
           ),
           questions (
             id,
             question_text,
             question_type,
-            options
+            options,
+            correct_answer,
+            points,
+            difficulty_level,
+            tags,
+            created_at
           )
         `)
         .eq('candidate_id', candidateId);
 
       if (answersError) throw answersError;
 
-      // Get all test sessions
+      // Get all test sessions with metadata
       const { data: allSessions, error: sessionsError } = await supabase
         .from('test_sessions')
-        .select('*')
+        .select(`
+          *,
+          sections (
+            id,
+            name,
+            description
+          )
+        `)
         .eq('candidate_id', candidateId);
 
       if (sessionsError) throw sessionsError;
 
-      // Calculate total time taken across all sessions
+      // Calculate comprehensive statistics
       const totalTimeSpent = allSessions?.reduce((total, session) => {
         return total + (session.total_time_seconds || 0);
       }, 0) || 0;
 
-      // Prepare comprehensive submission data
+      const totalQuestions = sections.reduce((sum, section) => sum + section.question_count, 0);
+      const totalAnswers = sections.reduce((sum, section) => sum + section.completed_answers, 0);
+      const completionPercentage = totalQuestions > 0 ? Math.round((totalAnswers / totalQuestions) * 100) : 0;
+
+      // Prepare comprehensive submission data with ALL metadata
       const submissionData = {
+        // Candidate Information
         candidate_id: candidateId,
         candidate_email: candidate.email,
         candidate_name: candidate.full_name,
         candidate_phone: candidate.phone,
         candidate_profile_data: candidate.profile_data,
+        candidate_created_at: candidate.created_at,
+        candidate_test_status: 'completed',
         user_id: user.id,
+        user_metadata: user.user_metadata,
+
+        // Company Information
         company_id: candidate.company_id,
         company_name: candidate.companies?.name,
         company_email: candidate.companies?.email,
         company_industry: candidate.companies?.industry,
+        company_profile_data: candidate.companies?.profile_data,
+        company_created_at: candidate.companies?.created_at,
+
+        // Test Statistics
         sections_completed: sections.length,
-        total_questions: sections.reduce((sum, section) => sum + section.question_count, 0),
-        total_answers: sections.reduce((sum, section) => sum + section.completed_answers, 0),
+        total_questions: totalQuestions,
+        total_answers: totalAnswers,
+        completion_percentage: completionPercentage,
         total_time_spent_seconds: totalTimeSpent,
-        answers: allAnswers,
-        test_sessions: allSessions,
+        total_time_spent_minutes: Math.round(totalTimeSpent / 60),
+
+        // Detailed Answers with Full Context
+        answers: allAnswers?.map(answer => ({
+          ...answer,
+          section_details: answer.sections,
+          question_details: answer.questions,
+          time_per_question: answer.time_taken_seconds || 0
+        })),
+
+        // Test Sessions with Metadata
+        test_sessions: allSessions?.map(session => ({
+          ...session,
+          section_details: session.sections,
+          duration_minutes: session.total_time_seconds ? Math.round(session.total_time_seconds / 60) : 0
+        })),
+
+        // Section Analysis
         sections_data: sections,
-        submission_timestamp: new Date().toISOString(),
-        test_status: 'completed',
-        submitted_from: window.location.origin,
         section_breakdown: sections.map(section => ({
           section_id: section.id,
           section_name: section.name,
+          section_description: section.description,
+          time_limit_minutes: section.time_limit_minutes,
           questions_count: section.question_count,
           answers_count: section.completed_answers,
           completion_percentage: getSectionProgress(section),
-          status: getSectionStatus(section)
-        }))
+          status: getSectionStatus(section),
+          section_answers: allAnswers?.filter(answer => answer.section_id === section.id) || []
+        })),
+
+        // Submission Metadata
+        submission_timestamp: new Date().toISOString(),
+        test_status: 'completed',
+        submitted_from: window.location.origin,
+        platform: 'web',
+        browser_info: navigator.userAgent,
+        
+        // Performance Metrics
+        average_time_per_question: totalAnswers > 0 ? Math.round(totalTimeSpent / totalAnswers) : 0,
+        questions_attempted: totalAnswers,
+        questions_skipped: totalQuestions - totalAnswers,
+        
+        // Additional Context
+        submission_method: 'final_dashboard_submission',
+        all_sections_completed: areAllSectionsCompleted(),
+        retry_count: testSessions.length,
+        total_attempts: testSessions.reduce((sum, session) => sum + (session.attempt || 0), 0)
       };
 
-      console.log('Submitting comprehensive test data to n8n:', submissionData);
+      console.log('Submitting COMPREHENSIVE test data to n8n:', submissionData);
 
-      // Send to n8n webhook with proper headers
+      // Send to n8n webhook with enhanced headers
       const webhookResponse = await fetch(ACTIVE_WEBHOOKS.TEST_EVALUATION, {
         method: 'POST',
         headers: {
@@ -297,6 +363,10 @@ const CandidateDashboard = () => {
           'X-Company-ID': candidate.company_id,
           'X-User-ID': user.id,
           'X-Submission-Time': new Date().toISOString(),
+          'X-Total-Questions': totalQuestions.toString(),
+          'X-Total-Answers': totalAnswers.toString(),
+          'X-Completion-Percentage': completionPercentage.toString(),
+          'X-Platform': 'web-dashboard',
         },
         body: JSON.stringify(submissionData),
       });
@@ -306,6 +376,9 @@ const CandidateDashboard = () => {
         console.error('Webhook response error:', errorText);
         throw new Error(`Failed to submit test for evaluation: ${webhookResponse.status} ${webhookResponse.statusText}`);
       }
+
+      const webhookResult = await webhookResponse.json();
+      console.log('N8N webhook success response:', webhookResult);
 
       // Update candidate status in database
       await supabase
@@ -318,11 +391,13 @@ const CandidateDashboard = () => {
 
       toast({
         title: "Test Submitted Successfully!",
-        description: "Your test has been submitted for evaluation. You will be notified of the results.",
+        description: "Your comprehensive test data has been submitted for evaluation. You will be notified of the results.",
       });
 
       // Refresh the page to show updated status
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
 
     } catch (error: any) {
       console.error('Error submitting final test:', error);
@@ -367,7 +442,7 @@ const CandidateDashboard = () => {
                   All Sections Completed!
                 </CardTitle>
                 <CardDescription>
-                  You have completed all test sections. Click below to submit your final test for evaluation.
+                  You have completed all test sections. Click below to submit your final test with complete metadata for evaluation.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -377,7 +452,7 @@ const CandidateDashboard = () => {
                   className="bg-green-600 hover:bg-green-700"
                   size="lg"
                 >
-                  {isSubmittingFinal ? "Submitting..." : "Submit Final Test"}
+                  {isSubmittingFinal ? "Submitting Complete Data..." : "Submit Final Test with All Metadata"}
                 </Button>
               </CardContent>
             </Card>
