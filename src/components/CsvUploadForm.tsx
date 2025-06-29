@@ -54,72 +54,91 @@ const CsvUploadForm = () => {
 
     setLoading(true);
     try {
-      console.log('Starting CSV upload process...');
+      console.log('=== CSV UPLOAD PROCESS STARTING ===');
+      console.log('Target webhook URL:', ACTIVE_WEBHOOKS.USER_CREATION);
       console.log('Company details:', {
         companyId: company.id,
         companyName: company.name,
         industry: company.industry,
         adminUserId: user.id
       });
+      console.log('File details:', {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      });
       
-      // Create FormData for n8n webhook with binary file
+      // Create FormData with all required fields
       const formData = new FormData();
       
-      // Add all required fields for n8n workflow
+      // Add metadata fields
+      formData.append('action', 'csv_upload');
       formData.append('adminUserId', user.id);
       formData.append('companyId', company.id);
       formData.append('companyName', company.name);
       formData.append('industry', company.industry);
       formData.append('filename', file.name);
       formData.append('batch_id', `BATCH_${Date.now()}`);
-      formData.append('action', 'csv_upload');
+      formData.append('timestamp', new Date().toISOString());
       
-      // Add the CSV file as binary data - this is crucial for n8n to receive it properly
-      formData.append('file', file, file.name);
-
-      console.log('FormData prepared with binary file:', {
-        adminUserId: user.id,
-        companyId: company.id,
-        companyName: company.name,
-        industry: company.industry,
-        filename: file.name,
-        fileSize: file.size,
-        fileType: file.type
-      });
-
-      // Send POST request directly to n8n webhook
-      console.log('Sending POST request to:', ACTIVE_WEBHOOKS.USER_CREATION);
+      // Add the binary CSV file - this is crucial for n8n
+      formData.append('csvFile', file, file.name);
       
-      const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
-        method: 'POST', // Explicitly ensure POST method
-        body: formData, // Send FormData with binary file
-        headers: {
-          'User-Agent': 'Parikshan-AI/1.0',
-          // Don't set Content-Type - let browser set it with boundary for FormData
-        },
-        mode: 'cors',
-      });
-
-      console.log('Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('N8N webhook error:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText
-        });
-        throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+      console.log('FormData entries:');
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`${key}: File(${value.name}, ${value.size} bytes, ${value.type})`);
+        } else {
+          console.log(`${key}: ${value}`);
+        }
       }
 
-      // Handle successful response
-      const result = await response.text();
-      console.log('N8N webhook success:', result);
+      console.log('=== SENDING POST REQUEST ===');
+      console.log('Method: POST');
+      console.log('URL:', ACTIVE_WEBHOOKS.USER_CREATION);
+      
+      // Use XMLHttpRequest for more control over the request
+      const xhr = new XMLHttpRequest();
+      
+      const uploadPromise = new Promise((resolve, reject) => {
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            console.log('XHR Response Status:', xhr.status);
+            console.log('XHR Response Text:', xhr.responseText);
+            console.log('XHR Response Headers:', xhr.getAllResponseHeaders());
+            
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.responseText);
+            } else {
+              reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText} - ${xhr.responseText}`));
+            }
+          }
+        };
+        
+        xhr.onerror = function() {
+          console.error('XHR Error occurred');
+          reject(new Error('Network error occurred'));
+        };
+        
+        xhr.ontimeout = function() {
+          console.error('XHR Timeout occurred');
+          reject(new Error('Request timeout'));
+        };
+      });
 
+      // Configure the request
+      xhr.open('POST', ACTIVE_WEBHOOKS.USER_CREATION, true);
+      xhr.setRequestHeader('User-Agent', 'Parikshan-AI/1.0');
+      xhr.timeout = 30000; // 30 second timeout
+      
+      console.log('XHR configured - sending FormData...');
+      xhr.send(formData);
+      
+      // Wait for the upload to complete
+      await uploadPromise;
+
+      console.log('=== UPLOAD SUCCESSFUL ===');
+      
       toast({
         title: "Upload Started",
         description: "CSV file is being processed. Candidates will appear shortly.",
@@ -131,11 +150,14 @@ const CsvUploadForm = () => {
       if (fileInput) fileInput.value = '';
 
     } catch (error: any) {
-      console.error('CSV Upload Error:', error);
+      console.error('=== CSV UPLOAD ERROR ===');
+      console.error('Error details:', error);
       
       let errorMessage = "Failed to upload CSV file";
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      if (error.message.includes('Network error')) {
         errorMessage = "Network error - please check your connection and try again";
+      } else if (error.message.includes('timeout')) {
+        errorMessage = "Request timeout - the server may be busy, please try again";
       } else if (error.message) {
         errorMessage = error.message;
       }
