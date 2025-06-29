@@ -1,15 +1,13 @@
 
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { TestHeader } from "@/components/test/TestHeader";
-import { TestProgress } from "@/components/test/TestProgress";
-import { QuestionCard } from "@/components/test/QuestionCard";
-import { QuestionInput } from "@/components/test/QuestionInput";
-import { TestNavigation } from "@/components/test/TestNavigation";
-import { QuestionOverview } from "@/components/test/QuestionOverview";
+import { QuestionRenderer } from "@/components/test/QuestionRenderer";
+import { ProgressBar } from "@/components/test/ProgressBar";
+import { SubmitEvaluation } from "@/components/test/SubmitEvaluation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
@@ -27,6 +25,8 @@ interface Question {
 
 const TestSection = () => {
   const { sectionId } = useParams();
+  const [searchParams] = useSearchParams();
+  const candidateIdFromUrl = searchParams.get('candidateId');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -49,37 +49,32 @@ const TestSection = () => {
       try {
         console.log('Loading questions for section:', sectionId);
         
-        // Get candidate record
-        const { data: candidate, error: candidateError } = await supabase
-          .from('candidates')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
+        let finalCandidateId = candidateIdFromUrl;
+        
+        // If no candidateId in URL, get it from user
+        if (!finalCandidateId) {
+          const { data: candidate, error: candidateError } = await supabase
+            .from('candidates')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
 
-        if (candidateError) {
-          console.error('Error fetching candidate:', candidateError);
-          toast({
-            title: "Error",
-            description: "Candidate record not found",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
+          if (candidateError) {
+            console.error('Error fetching candidate:', candidateError);
+            toast({
+              title: "Error",
+              description: "Candidate record not found",
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+
+          finalCandidateId = candidate.id;
         }
 
-        if (!candidate) {
-          console.error('No candidate found for user:', user.id);
-          toast({
-            title: "Error",
-            description: "Candidate record not found",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
-        console.log('Found candidate ID:', candidate.id);
-        setCandidateId(candidate.id);
+        console.log('Using candidate ID:', finalCandidateId);
+        setCandidateId(finalCandidateId);
 
         // Get section info
         const { data: section, error: sectionError } = await supabase
@@ -110,7 +105,7 @@ const TestSection = () => {
           .from('questions')
           .select('*')
           .eq('section_id', sectionId)
-          .eq('candidate_id', candidate.id)
+          .eq('candidate_id', finalCandidateId)
           .order('question_number');
 
         if (questionsError) {
@@ -145,7 +140,7 @@ const TestSection = () => {
             .from('answers')
             .select('*')
             .eq('section_id', sectionId)
-            .eq('candidate_id', candidate.id);
+            .eq('candidate_id', finalCandidateId);
             
           if (!answersError && answersData && answersData.length > 0) {
             console.log('Found existing answers:', answersData.length);
@@ -154,7 +149,6 @@ const TestSection = () => {
             answersData.forEach(answer => {
               const questionIndex = formattedQuestions.findIndex(q => q.id === answer.question_id);
               if (questionIndex !== -1) {
-                // Handle different answer_data structures
                 let answerValue = answer.answer_data;
                 if (typeof answerValue === 'object' && answerValue !== null && 'value' in answerValue) {
                   answerValue = (answerValue as any).value;
@@ -181,7 +175,7 @@ const TestSection = () => {
     };
 
     loadQuestions();
-  }, [sectionId, user, toast]);
+  }, [sectionId, user, toast, candidateIdFromUrl]);
 
   // Question timer
   useEffect(() => {
@@ -190,7 +184,6 @@ const TestSection = () => {
     const timer = setInterval(() => {
       setQuestionTimeRemaining(prev => {
         if (prev <= 1) {
-          // Auto-move to next question when time runs out
           if (currentQuestion < questions.length - 1) {
             handleNext();
           }
@@ -250,7 +243,6 @@ const TestSection = () => {
     if (!user || !candidateId) return;
     
     try {
-      // Save current answers
       const answersToSave = Object.entries(answers).map(([qIndex, answer]) => ({
         candidate_id: candidateId,
         question_id: questions[parseInt(qIndex)]?.id,
@@ -279,32 +271,25 @@ const TestSection = () => {
   };
 
   const handleSubmit = async () => {
+    if (!candidateId || !sectionId) return;
+    
     setIsSubmitting(true);
     await handleSave();
 
-    try {
-      await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          candidate_id: candidateId,
-          section_id: sectionId,
-          answers: answers,
-        }),
-      });
-    } catch (error) {
-      console.error('Error calling test evaluation webhook:', error);
-    }
-    
-    setTimeout(() => {
-      toast({
-        title: "Section Completed",
-        description: `${sectionName} submitted successfully!`,
-      });
-      navigate("/candidate-dashboard");
-    }, 1500);
+    const submitEvaluation = SubmitEvaluation({
+      candidateId,
+      sectionId,
+      answers,
+      questions,
+      onComplete: () => {
+        setTimeout(() => {
+          navigate("/candidate-dashboard");
+        }, 1500);
+      }
+    });
+
+    await submitEvaluation.handleSubmit();
+    setIsSubmitting(false);
   };
 
   if (loading) {
@@ -338,8 +323,6 @@ const TestSection = () => {
     );
   }
 
-  const currentQ = questions[currentQuestion];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-white">
       <TestHeader
@@ -349,39 +332,26 @@ const TestSection = () => {
       />
 
       <div className="container mx-auto px-4 py-8">
-        <TestProgress
+        <ProgressBar
           sectionName={sectionName}
           currentQuestion={currentQuestion}
           totalQuestions={questions.length}
-          questionType={currentQ.question_type}
+          questionType={questions[currentQuestion]?.question_type || ''}
           answeredCount={Object.keys(answers).length}
+          answers={answers}
+          onQuestionSelect={handleQuestionSelect}
         />
 
-        <QuestionCard
-          question={currentQ}
-          questionNumber={currentQuestion + 1}
-          timeRemaining={questionTimeRemaining}
-        >
-          <QuestionInput
-            question={currentQ}
-            answer={answers[currentQuestion]}
-            onAnswerChange={(answer) => handleAnswerChange(currentQuestion, answer)}
-          />
-        </QuestionCard>
-
-        <TestNavigation
-          currentQuestion={currentQuestion}
-          totalQuestions={questions.length}
-          isSubmitting={isSubmitting}
-          onPrevious={handlePrevious}
-          onNext={handleNext}
-          onSubmit={handleSubmit}
-        />
-
-        <QuestionOverview
-          totalQuestions={questions.length}
+        <QuestionRenderer
+          questions={questions}
           currentQuestion={currentQuestion}
           answers={answers}
+          questionTimeRemaining={questionTimeRemaining}
+          isSubmitting={isSubmitting}
+          onAnswerChange={handleAnswerChange}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          onSubmit={handleSubmit}
           onQuestionSelect={handleQuestionSelect}
         />
       </div>

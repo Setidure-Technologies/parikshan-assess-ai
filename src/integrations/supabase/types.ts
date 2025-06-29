@@ -425,7 +425,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      assign_user_role: {
+        Args: { target_user_id: string; new_role: string }
+        Returns: undefined
+      }
+      is_admin: {
+        Args: { user_id?: string }
+        Returns: boolean
+      }
+      promote_user_to_admin: {
+        Args: { user_email: string }
+        Returns: undefined
+      }
     }
     Enums: {
       difficulty_level: "easy" | "moderate" | "hard"
@@ -441,7 +452,14 @@ export type Database = {
         | "questions_generated"
         | "in_progress"
         | "completed"
-      user_role: "admin" | "candidate"
+      user_role:
+        | "admin"
+        | "candidate"
+        | "patient"
+        | "survivor"
+        | "caregiver"
+        | "volunteer"
+        | "ngo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -572,7 +590,15 @@ export const Constants = {
         "in_progress",
         "completed",
       ],
-      user_role: ["admin", "candidate"],
+      user_role: [
+        "admin",
+        "candidate",
+        "patient",
+        "survivor",
+        "caregiver",
+        "volunteer",
+        "ngo",
+      ],
     },
   },
 } as const

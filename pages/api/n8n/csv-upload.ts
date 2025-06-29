@@ -1,5 +1,7 @@
+
 import formidable from 'formidable';
 import fs from 'fs';
+import { ACTIVE_WEBHOOKS } from '../../src/config/webhooks';
 
 // Disable Next.js body parser to handle file uploads with formidable
 export const config = {
@@ -16,7 +18,7 @@ export default async function handler(req: any, res: any) {
   try {
     console.log('CSV upload request received, processing with formidable.');
     
-    const webhookUrl = 'https://n8n.erudites.in/webhook-test/usercreation';
+    const webhookUrl = ACTIVE_WEBHOOKS.USER_CREATION;
     
     if (!webhookUrl) {
       console.error('N8N webhook URL not configured');

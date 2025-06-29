@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
 
 interface Section {
   id: string;
@@ -43,18 +45,19 @@ const CandidateDashboard = () => {
 
         if (candidateError) throw candidateError;
         setCandidateId(candidate.id);
+        console.log('Found candidate ID:', candidate.id);
 
-        // Get sections with question counts
-        const { data: sectionsData, error: sectionsError } = await supabase
+        // Get all sections
+        const { data: allSections, error: sectionsError } = await supabase
           .from('sections')
           .select('*')
           .order('display_order');
 
         if (sectionsError) throw sectionsError;
 
-        // For each section, get question count and completed answers count
-        const sectionsWithCounts = await Promise.all(
-          (sectionsData || []).map(async (section) => {
+        // For each section, check if questions exist for this candidate
+        const sectionsWithData = await Promise.all(
+          (allSections || []).map(async (section) => {
             // Get question count for this section and candidate
             const { data: questions, error: questionsError } = await supabase
               .from('questions')
@@ -64,6 +67,7 @@ const CandidateDashboard = () => {
 
             if (questionsError) {
               console.error('Error fetching questions for section:', section.name, questionsError);
+              return null;
             }
 
             // Get completed answers count for this section and candidate
@@ -77,16 +81,26 @@ const CandidateDashboard = () => {
               console.error('Error fetching answers for section:', section.name, answersError);
             }
 
+            const questionCount = questions?.length || 0;
+            const answersCount = answers?.length || 0;
+
+            console.log(`Section ${section.name}: ${questionCount} questions, ${answersCount} answers`);
+
             return {
               ...section,
-              question_count: questions?.length || 0,
-              completed_answers: answers?.length || 0
+              question_count: questionCount,
+              completed_answers: answersCount
             };
           })
         );
 
-        // Filter sections that have questions available for this candidate
-        const availableSections = sectionsWithCounts.filter(section => section.question_count > 0);
+        // Filter out null results and sections without questions
+        const availableSections = sectionsWithData
+          .filter((section): section is Section => 
+            section !== null && section.question_count > 0
+          );
+
+        console.log('Available sections:', availableSections.map(s => s.name));
         setSections(availableSections);
 
         // Get test sessions
@@ -231,37 +245,26 @@ const CandidateDashboard = () => {
 
       // Prepare comprehensive submission data
       const submissionData = {
-        // Candidate Information
         candidate_id: candidateId,
         candidate_email: candidate.email,
         candidate_name: candidate.full_name,
         candidate_phone: candidate.phone,
         candidate_profile_data: candidate.profile_data,
         user_id: user.id,
-        
-        // Company Information
         company_id: candidate.company_id,
         company_name: candidate.companies?.name,
         company_email: candidate.companies?.email,
         company_industry: candidate.companies?.industry,
-        
-        // Test Statistics
         sections_completed: sections.length,
         total_questions: sections.reduce((sum, section) => sum + section.question_count, 0),
         total_answers: sections.reduce((sum, section) => sum + section.completed_answers, 0),
         total_time_spent_seconds: totalTimeSpent,
-        
-        // Test Data
         answers: allAnswers,
         test_sessions: allSessions,
         sections_data: sections,
-        
-        // Metadata
         submission_timestamp: new Date().toISOString(),
         test_status: 'completed',
         submitted_from: window.location.origin,
-        
-        // Section-wise breakdown
         section_breakdown: sections.map(section => ({
           section_id: section.id,
           section_name: section.name,
@@ -275,7 +278,7 @@ const CandidateDashboard = () => {
       console.log('Submitting comprehensive test data to n8n:', submissionData);
 
       // Send to n8n webhook with proper headers
-      const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
+      const webhookResponse = await fetch(ACTIVE_WEBHOOKS.TEST_EVALUATION, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
