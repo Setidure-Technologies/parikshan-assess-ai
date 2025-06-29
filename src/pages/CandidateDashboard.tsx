@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -212,8 +213,7 @@ const CandidateDashboard = () => {
             name,
             email,
             industry,
-            created_at,
-            profile_data
+            created_at
           )
         `)
         .eq('id', candidateId)
@@ -231,7 +231,6 @@ const CandidateDashboard = () => {
             name,
             description,
             time_limit_minutes,
-            instructions,
             created_at
           ),
           questions (
@@ -239,10 +238,7 @@ const CandidateDashboard = () => {
             question_text,
             question_type,
             options,
-            correct_answer,
-            points,
-            difficulty_level,
-            tags,
+            metadata,
             created_at
           )
         `)
@@ -292,7 +288,6 @@ const CandidateDashboard = () => {
         company_name: candidate.companies?.name,
         company_email: candidate.companies?.email,
         company_industry: candidate.companies?.industry,
-        company_profile_data: candidate.companies?.profile_data,
         company_created_at: candidate.companies?.created_at,
 
         // Test Statistics
