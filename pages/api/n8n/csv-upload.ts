@@ -56,56 +56,24 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Read the content of the uploaded CSV file
-    const csvContent = fs.readFileSync(csvFile.filepath, 'utf8');
+    // Use native FormData for fetch
+    const proxyFormData = new FormData();
+    if (adminUserId) proxyFormData.append('adminUserId', adminUserId);
+    if (companyId) proxyFormData.append('companyId', companyId);
+    if (companyName) proxyFormData.append('companyName', companyName);
+    if (industry) proxyFormData.append('industry', industry);
+    if (filename) proxyFormData.append('filename', filename);
 
-    if (!csvContent) {
-      return res.status(400).json({ error: 'CSV file is empty.' });
-    }
+    const fileContent = fs.readFileSync(csvFile.filepath);
+    const fileBlob = new Blob([fileContent], { type: csvFile.mimetype || 'text/csv' });
 
-    // Parse CSV content into candidate records
-    const lines = csvContent.split('\n').filter((line: string) => line.trim());
-    if (lines.length < 2) {
-      return res.status(400).json({ error: 'CSV must have a header and at least one data row.' });
-    }
-    
-    const candidates: { full_name: string; email: string; phone: string | null; company_id: string; }[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map((v: string) => v.trim());
-      if (values.length >= 2) { // At least name and email
-        const candidate = {
-          full_name: values[0] || '',
-          email: values[1] || '',
-          phone: values[2] || null,
-          company_id: companyId
-        };
-        candidates.push(candidate);
-      }
-    }
-
-    console.log(`Parsed ${candidates.length} candidates from CSV.`);
-
-    // Prepare payload for n8n webhook
-    const webhookPayload = {
-      action: 'bulk_create_candidates',
-      candidates: candidates,
-      company_id: companyId,
-      admin_user_id: adminUserId,
-      company_name: companyName,
-      industry: industry,
-      filename: filename || csvFile.originalFilename, // Use original filename if available
-      timestamp: new Date().toISOString()
-    };
-
-    console.log('Sending to n8n webhook:', JSON.stringify(webhookPayload, null, 2));
+    proxyFormData.append('csvFile', fileBlob, csvFile.originalFilename || 'upload.csv');
 
     // Send to n8n webhook
     const response = await fetch(webhookUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(webhookPayload),
+      body: proxyFormData,
+      // Let fetch set the headers automatically for multipart/form-data
     });
 
     console.log('N8N response status:', response.status);
@@ -122,7 +90,7 @@ export default async function handler(req: any, res: any) {
     res.status(202).json({ 
       success: true, 
       message: 'CSV upload initiated successfully',
-      candidates_count: candidates.length,
+      candidates_count: result.candidates_count, // Assuming n8n returns this
       admin_user_id: adminUserId,
       company_name: companyName
     });
