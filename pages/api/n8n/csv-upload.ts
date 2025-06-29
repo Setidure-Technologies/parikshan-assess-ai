@@ -1,7 +1,7 @@
 
 import formidable from 'formidable';
 import fs from 'fs';
-import { ACTIVE_WEBHOOKS } from '../../src/config/webhooks';
+import { ACTIVE_WEBHOOKS } from '../../../src/config/webhooks';
 
 // Disable Next.js body parser to handle file uploads with formidable
 export const config = {
@@ -10,7 +10,7 @@ export const config = {
   },
 };
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -59,14 +59,15 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Read the CSV file content
-    const fileContent = fs.readFileSync(csvFile.filepath);
-    console.log('File content read, size:', fileContent.length);
+    // Read the CSV file content as buffer
+    const fileBuffer = fs.readFileSync(csvFile.filepath);
+    console.log('File buffer read, size:', fileBuffer.length);
 
-    // Create FormData for binary file upload
+    // Create FormData for binary file upload - NO JSON CONVERSION
+    const FormData = require('form-data');
     const formData = new FormData();
     
-    // Add metadata fields
+    // Add metadata fields first
     formData.append('adminUserId', adminUserId);
     formData.append('companyId', companyId);
     formData.append('companyName', companyName || '');
@@ -74,20 +75,21 @@ export default async function handler(req: any, res: any) {
     formData.append('filename', filename || csvFile.originalFilename || 'upload.csv');
     formData.append('batch_id', `BATCH_${Date.now()}`);
 
-    // Add the CSV file as binary blob
-    const blob = new Blob([fileContent], { 
-      type: csvFile.mimetype || 'text/csv' 
+    // Add the CSV file as binary buffer - DIRECT BINARY UPLOAD
+    formData.append('file', fileBuffer, {
+      filename: csvFile.originalFilename || 'upload.csv',
+      contentType: csvFile.mimetype || 'text/csv'
     });
-    formData.append('file', blob, csvFile.originalFilename || 'upload.csv');
 
     console.log('Sending binary CSV to webhook:', webhookUrl);
-    console.log('FormData entries:', [...formData.entries()].map(([key, value]) => [key, typeof value === 'object' ? 'File/Blob' : value]));
 
-    // Send to n8n webhook
+    // Send to n8n webhook with proper headers
     const response = await fetch(webhookUrl, {
       method: 'POST',
       body: formData,
-      // Don't set Content-Type header - let browser set it with boundary
+      headers: {
+        ...formData.getHeaders(),
+      },
     });
 
     console.log('N8N webhook response status:', response.status);
@@ -101,16 +103,16 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Try to parse JSON response, but handle non-JSON responses
+    // Get response as text first, then try to parse if it's JSON
+    const responseText = await response.text();
+    console.log('N8N raw response:', responseText);
+
     let result;
-    const contentType = response.headers.get('content-type');
-    
-    if (contentType && contentType.includes('application/json')) {
-      result = await response.json();
-    } else {
-      const textResult = await response.text();
-      console.log('N8N response (non-JSON):', textResult);
-      result = { message: textResult, success: true };
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      // If not JSON, use as plain text response
+      result = { message: responseText, success: true };
     }
 
     console.log('N8N response data:', result);
@@ -124,7 +126,7 @@ export default async function handler(req: any, res: any) {
       webhook_response: result
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in csv-upload API:', error);
     res.status(500).json({ 
       error: error.message,

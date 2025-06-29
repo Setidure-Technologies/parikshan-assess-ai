@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,31 +72,33 @@ const CsvUploadForm = () => {
         companyName: company.name
       });
 
-      // Create FormData for binary file upload
+      // Create FormData for binary file upload - DIRECT BINARY SEND
       const formData = new FormData();
-      formData.append('csvFile', file);
+      formData.append('csvFile', file); // Binary file directly
       formData.append('adminUserId', profile.id);
       formData.append('companyId', profile.company_id);
       formData.append('companyName', company.name);
-      formData.append('industry', company.industry);
+      formData.append('industry', company.industry || '');
       formData.append('filename', file.name);
 
-      console.log('Uploading CSV file to API...');
+      console.log('Uploading CSV file to API - BINARY UPLOAD...');
 
       const response = await fetch('/api/n8n/csv-upload', {
         method: 'POST',
         body: formData,
-        // No headers - let browser set Content-Type with boundary
+        // NO HEADERS - let browser set Content-Type with boundary for multipart/form-data
       });
 
       console.log('API response status:', response.status);
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
       const result = await response.json();
       console.log('API response data:', result);
-
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP ${response.status}: Upload failed`);
-      }
 
       toast({
         title: "Upload Success",
@@ -211,7 +214,7 @@ const CsvUploadForm = () => {
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <h4 className="text-sm font-medium text-blue-900 mb-2">What happens next:</h4>
           <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>CSV file uploaded as binary with admin and company details</li>
+            <li>CSV file uploaded as BINARY with admin and company details</li>
             <li>Candidates are created from your CSV</li>
             <li>AI generates personalized questions for each candidate</li>
             <li>Test credentials are automatically sent to candidates</li>
