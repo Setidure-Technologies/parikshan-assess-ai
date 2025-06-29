@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
-import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
+import { ACTIVE_WEBHOOKS, makeWebhookRequest } from '@/config/webhooks';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 
@@ -68,7 +68,6 @@ const CsvUploadForm = () => {
       // Add the CSV file
       formData.append('csvFile', file);
 
-      console.log('Sending to n8n webhook:', ACTIVE_WEBHOOKS.USER_CREATION);
       console.log('Form data prepared:', {
         adminUserId: user.id,
         companyId: profile.company_id,
@@ -76,18 +75,8 @@ const CsvUploadForm = () => {
         fileSize: file.size
       });
 
-      // Send directly to n8n webhook with proper CORS handling
-      const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'User-Agent': 'Parikshan-AI/1.0',
-        },
-        mode: 'cors', // Explicitly set CORS mode
-      });
-
-      console.log('N8N Response Status:', response.status);
-      console.log('N8N Response Headers:', Object.fromEntries(response.headers.entries()));
+      // Use the centralized webhook request helper
+      const response = await makeWebhookRequest(ACTIVE_WEBHOOKS.USER_CREATION, formData);
       
       if (!response.ok) {
         const errorText = await response.text();

@@ -1,8 +1,8 @@
-
 import { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
 
 interface AuthContextType {
   user: User | null;
@@ -114,18 +114,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           description: "Please check your email to verify your account.",
         });
         
-        // If it's a candidate, trigger the n8n workflow
+        // If it's a candidate, trigger the n8n workflow directly
         if (userRole === 'candidate') {
           try {
-            await fetch('/api/n8n/create-candidate', {
+            console.log('Triggering candidate creation webhook:', ACTIVE_WEBHOOKS.USER_CREATION);
+            
+            const formData = new FormData();
+            formData.append('email', email);
+            formData.append('full_name', fullName);
+            formData.append('action', 'create_candidate');
+            
+            await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
               method: 'POST',
+              body: formData,
               headers: {
-                'Content-Type': 'application/json',
+                'User-Agent': 'Parikshan-AI/1.0',
               },
-              body: JSON.stringify({
-                email,
-                full_name: fullName,
-              }),
+              mode: 'cors',
             });
           } catch (apiError) {
             console.error('Error creating candidate via n8n:', apiError);
