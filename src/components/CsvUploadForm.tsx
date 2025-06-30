@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
-import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useCompany } from '@/hooks/useCompany';
@@ -55,7 +54,7 @@ const CsvUploadForm = () => {
     setLoading(true);
     try {
       console.log('=== CSV UPLOAD PROCESS STARTING ===');
-      console.log('Target webhook URL:', ACTIVE_WEBHOOKS.USER_CREATION);
+      console.log('Using local API route: /api/n8n/csv-upload');
       console.log('Company details:', {
         companyId: company.id,
         companyName: company.name,
@@ -72,7 +71,6 @@ const CsvUploadForm = () => {
       const formData = new FormData();
       
       // Add metadata fields
-      formData.append('action', 'csv_upload');
       formData.append('adminUserId', user.id);
       formData.append('companyId', company.id);
       formData.append('companyName', company.name);
@@ -93,29 +91,25 @@ const CsvUploadForm = () => {
         }
       }
 
-      console.log('=== SENDING DIRECT POST REQUEST ===');
+      console.log('=== SENDING REQUEST TO LOCAL API ===');
       
-      // Make direct POST request with fetch
-      const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
+      // Call the local API route instead of direct n8n webhook
+      const response = await fetch('/api/n8n/csv-upload', {
         method: 'POST',
         body: formData,
-        headers: {
-          'User-Agent': 'Parikshan-AI/1.0',
-        },
-        mode: 'cors',
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('Local API response status:', response.status);
+      console.log('Local API response headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Response error:', errorText);
+        console.error('Local API error:', errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
-      const responseText = await response.text();
-      console.log('Response body:', responseText);
+      const responseData = await response.json();
+      console.log('Local API response body:', responseData);
 
       console.log('=== UPLOAD SUCCESSFUL ===');
       
