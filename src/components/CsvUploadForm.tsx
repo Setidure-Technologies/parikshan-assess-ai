@@ -5,17 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Upload } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useCompany } from '@/hooks/useCompany';
-import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
+import { Upload, FileText, AlertCircle } from 'lucide-react';
 
 const CsvUploadForm = () => {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState<string[]>([]);
   const { toast } = useToast();
-  const { user } = useAuth();
   const { profile } = useProfile();
   const { company } = useCompany(profile);
 
@@ -23,60 +21,29 @@ const CsvUploadForm = () => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile && selectedFile.type === 'text/csv') {
       setFile(selectedFile);
+      
+      // Show preview of CSV
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const csv = event.target?.result as string;
+        const lines = csv.split('\n').slice(0, 4); // Show first 4 lines
+        setPreview(lines);
+      };
+      reader.readAsText(selectedFile);
     } else {
       toast({
         title: "Invalid file",
         description: "Please select a CSV file",
         variant: "destructive",
       });
+      setFile(null);
+      setPreview([]);
     }
-  };
-
-  const sendWithXHR = (formData: FormData): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      
-      xhr.open('POST', ACTIVE_WEBHOOKS.USER_CREATION, true);
-      
-      // Set headers
-      xhr.setRequestHeader('User-Agent', 'Parikshan-AI/1.0');
-      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-      
-      // Handle response
-      xhr.onreadystatechange = () => {
-        if (xhr.readyState === XMLHttpRequest.DONE) {
-          console.log('XHR Response Status:', xhr.status);
-          console.log('XHR Response Headers:', xhr.getAllResponseHeaders());
-          console.log('XHR Response Text:', xhr.responseText);
-          
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.responseText);
-          } else {
-            reject(new Error(`XHR failed: ${xhr.status} - ${xhr.statusText} - ${xhr.responseText}`));
-          }
-        }
-      };
-      
-      xhr.onerror = () => {
-        console.error('XHR Error Event');
-        reject(new Error('Network error occurred'));
-      };
-      
-      xhr.ontimeout = () => {
-        console.error('XHR Timeout');
-        reject(new Error('Request timeout'));
-      };
-      
-      // Set timeout to 30 seconds
-      xhr.timeout = 30000;
-      
-      console.log('Sending XHR request to:', ACTIVE_WEBHOOKS.USER_CREATION);
-      xhr.send(formData);
-    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!file) {
       toast({
         title: "No file selected",
@@ -86,10 +53,10 @@ const CsvUploadForm = () => {
       return;
     }
 
-    if (!user || !profile || !company) {
+    if (!profile?.company_id || !company) {
       toast({
-        title: "Authentication required",
-        description: "Please log in and ensure company details are available",
+        title: "Company not found",
+        description: "Please ensure you have a company associated with your profile",
         variant: "destructive",
       });
       return;
@@ -97,93 +64,75 @@ const CsvUploadForm = () => {
 
     setLoading(true);
     try {
-      console.log('=== CSV UPLOAD PROCESS STARTING ===');
-      console.log('Using n8n webhook:', ACTIVE_WEBHOOKS.USER_CREATION);
-      console.log('Company details:', {
-        companyId: company.id,
-        companyName: company.name,
-        industry: company.industry,
-        adminUserId: user.id
-      });
-      console.log('File details:', {
-        name: file.name,
-        size: file.size,
-        type: file.type
-      });
-      
-      // Create FormData with all required fields
+      // Create FormData for binary file upload
       const formData = new FormData();
-      
-      // Add metadata fields
-      formData.append('adminUserId', user.id);
-      formData.append('companyId', company.id);
+      formData.append('csvFile', file);
+      formData.append('adminUserId', profile.id);
+      formData.append('companyId', profile.company_id);
       formData.append('companyName', company.name);
       formData.append('industry', company.industry);
       formData.append('filename', file.name);
-      formData.append('batch_id', `BATCH_${Date.now()}`);
-      formData.append('timestamp', new Date().toISOString());
-      formData.append('action', 'csv_upload');
-      
-      // Add the binary CSV file
-      formData.append('csvFile', file, file.name);
-      
-      console.log('FormData entries:');
-      for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          console.log(`${key}: File(${value.name}, ${value.size} bytes, ${value.type})`);
-        } else {
-          console.log(`${key}: ${value}`);
-        }
-      }
 
-      console.log('=== SENDING REQUEST WITH XHR ===');
-      
-      // Use XMLHttpRequest for better control
-      const responseText = await sendWithXHR(formData);
-      
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-        console.log('N8N webhook response body:', responseData);
-      } catch (e) {
-        console.log('Response is not JSON, treating as success');
-        responseData = { message: responseText, success: true };
-      }
-
-      console.log('=== UPLOAD SUCCESSFUL ===');
-      
-      toast({
-        title: "Upload Started",
-        description: "CSV file is being processed. Candidates will appear shortly.",
+      console.log('Uploading CSV with admin details:', {
+        adminUserId: profile.id,
+        companyId: profile.company_id,
+        companyName: company.name,
+        industry: company.industry,
+        filename: file.name
       });
 
-      // Reset form state
+      const response = await fetch('/api/n8n/csv-upload', {
+        method: 'POST',
+        body: formData, // Send as FormData for binary upload
+      });
+
+      const result = await response.json();
+      console.log('Upload response:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      toast({
+        title: "Upload Started",
+        description: `Processing ${result.candidates_count || 'multiple'} candidates. Questions will be generated automatically.`,
+      });
+
       setFile(null);
+      setPreview([]);
+      // Reset the file input
       const fileInput = document.getElementById('csvFile') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-
+      
+      // Refresh the page after a short delay to show new candidates
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
     } catch (error: any) {
-      console.error('=== CSV UPLOAD ERROR ===');
-      console.error('Error details:', error);
-      
-      let errorMessage = "Failed to upload CSV file";
-      if (error.message.includes('Network error')) {
-        errorMessage = "Network error - please check your connection and try again";
-      } else if (error.message.includes('timeout')) {
-        errorMessage = "Request timeout - the server may be busy, please try again";
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
+      console.error('Upload error:', error);
       toast({
         title: "Upload Failed",
-        description: errorMessage,
+        description: error.message || "Failed to upload CSV file",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
+
+  if (!profile?.company_id) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 text-amber-600">
+            <AlertCircle className="h-5 w-5" />
+            <p>Company setup required to upload candidates</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -194,13 +143,6 @@ const CsvUploadForm = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {company && (
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">
-              <strong>Company:</strong> {company.name} ({company.industry})
-            </p>
-          </div>
-        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="csvFile">CSV File</Label>
@@ -212,17 +154,66 @@ const CsvUploadForm = () => {
               className="cursor-pointer"
             />
             <p className="text-sm text-gray-500 mt-1">
-              CSV should contain: full_name, email, phone (optional)
+              CSV format: full_name, email, phone (optional)
             </p>
           </div>
+
+          {profile && company && (
+            <div className="grid grid-cols-2 gap-4 p-3 bg-blue-50 rounded-lg">
+              <div>
+                <p className="text-xs text-blue-600 font-medium">Admin ID</p>
+                <p className="text-sm text-blue-800">{profile.id}</p>
+              </div>
+              <div>
+                <p className="text-xs text-blue-600 font-medium">Company</p>
+                <p className="text-sm text-blue-800">{company.name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-blue-600 font-medium">Industry</p>
+                <p className="text-sm text-blue-800">{company.industry}</p>
+              </div>
+              <div>
+                <p className="text-xs text-blue-600 font-medium">Company ID</p>
+                <p className="text-sm text-blue-800">{profile.company_id}</p>
+              </div>
+            </div>
+          )}
+
+          {preview.length > 0 && (
+            <div className="border rounded-lg p-3 bg-gray-50">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-4 w-4" />
+                <span className="text-sm font-medium">Preview:</span>
+              </div>
+              <div className="text-xs font-mono space-y-1">
+                {preview.map((line, index) => (
+                  <div key={index} className={index === 0 ? 'font-bold' : ''}>
+                    {line.substring(0, 100)}{line.length > 100 ? '...' : ''}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Button 
             type="submit" 
-            disabled={!file || loading || !company}
+            disabled={!file || loading}
             className="w-full bg-cyan-500 hover:bg-cyan-600"
           >
-            {loading ? 'Uploading...' : 'Upload CSV'}
+            {loading ? 'Processing...' : 'Upload & Generate Tests'}
           </Button>
         </form>
+
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">What happens next:</h4>
+          <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+            <li>CSV file uploaded with admin and company details</li>
+            <li>Candidates are created from your CSV</li>
+            <li>AI generates personalized questions for each candidate</li>
+            <li>Test credentials are automatically sent to candidates</li>
+            <li>Candidates can take their assessments immediately</li>
+          </ol>
+        </div>
       </CardContent>
     </Card>
   );
