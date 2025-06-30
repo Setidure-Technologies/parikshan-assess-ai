@@ -64,56 +64,116 @@ const CsvUploadForm = () => {
 
     setLoading(true);
     try {
-      // Create FormData for binary file upload
-      const formData = new FormData();
-      formData.append('csvFile', file);
-      formData.append('adminUserId', profile.id);
-      formData.append('companyId', profile.company_id);
-      formData.append('companyName', company.name);
-      formData.append('industry', company.industry);
-      formData.append('filename', file.name);
+      // Read CSV content as text
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const csvContent = event.target?.result as string;
+        const lines = csvContent.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          toast({
+            title: "Invalid CSV",
+            description: "CSV must contain at least a header and one data row",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
 
-      console.log('Uploading CSV with admin details:', {
-        adminUserId: profile.id,
-        companyId: profile.company_id,
-        companyName: company.name,
-        industry: company.industry,
-        filename: file.name
-      });
+        // Parse CSV header to find column indices
+        const header = lines[0].split(',').map(col => col.trim().toLowerCase());
+        const nameIndex = header.findIndex(col => col.includes('name'));
+        const emailIndex = header.findIndex(col => col.includes('email'));
+        const phoneIndex = header.findIndex(col => col.includes('phone'));
 
-      const response = await fetch('/api/n8n/csv-upload', {
-        method: 'POST',
-        body: formData, // Send as FormData for binary upload
-      });
+        if (nameIndex === -1 || emailIndex === -1) {
+          toast({
+            title: "Invalid CSV format",
+            description: "CSV must contain 'name' and 'email' columns",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
 
-      const result = await response.json();
-      console.log('Upload response:', result);
+        console.log('Processing CSV with columns:', { nameIndex, emailIndex, phoneIndex });
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Upload failed');
-      }
+        let successCount = 0;
+        let errorCount = 0;
 
-      toast({
-        title: "Upload Started",
-        description: `Processing ${result.candidates_count || 'multiple'} candidates. Questions will be generated automatically.`,
-      });
+        // Process each candidate row
+        for (let i = 1; i < lines.length; i++) {
+          const row = lines[i].split(',').map(cell => cell.trim());
+          
+          if (row.length <= Math.max(nameIndex, emailIndex)) {
+            console.warn(`Skipping row ${i}: insufficient columns`);
+            continue;
+          }
 
-      setFile(null);
-      setPreview([]);
-      // Reset the file input
-      const fileInput = document.getElementById('csvFile') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
+          const candidateData = {
+            full_name: row[nameIndex] || '',
+            email: row[emailIndex] || '',
+            phone: phoneIndex >= 0 && row[phoneIndex] ? row[phoneIndex] : null,
+            user_id: profile.id,
+            company_id: profile.company_id
+          };
+
+          if (!candidateData.full_name || !candidateData.email) {
+            console.warn(`Skipping row ${i}: missing required data`);
+            continue;
+          }
+
+          try {
+            console.log(`Creating candidate ${i}:`, candidateData);
+            
+            const response = await fetch('/api/n8n/create-candidate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${profile.id}`,
+              },
+              body: JSON.stringify(candidateData),
+            });
+
+            if (response.ok) {
+              successCount++;
+              console.log(`Successfully created candidate: ${candidateData.email}`);
+            } else {
+              errorCount++;
+              console.error(`Failed to create candidate: ${candidateData.email}`);
+            }
+          } catch (error) {
+            errorCount++;
+            console.error(`Error creating candidate ${candidateData.email}:`, error);
+          }
+        }
+
+        toast({
+          title: "Upload Complete",
+          description: `Successfully processed ${successCount} candidates. ${errorCount > 0 ? `${errorCount} failed.` : ''}`,
+          variant: successCount > 0 ? "default" : "destructive",
+        });
+
+        setFile(null);
+        setPreview([]);
+        // Reset the file input
+        const fileInput = document.getElementById('csvFile') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+        
+        // Refresh after processing
+        if (successCount > 0) {
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        }
+      };
       
-      // Refresh the page after a short delay to show new candidates
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-      
+      reader.readAsText(file);
     } catch (error: any) {
       console.error('Upload error:', error);
       toast({
         title: "Upload Failed",
-        description: error.message || "Failed to upload CSV file",
+        description: error.message || "Failed to process CSV file",
         variant: "destructive",
       });
     } finally {
@@ -207,8 +267,8 @@ const CsvUploadForm = () => {
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <h4 className="text-sm font-medium text-blue-900 mb-2">What happens next:</h4>
           <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>CSV file uploaded with admin and company details</li>
-            <li>Candidates are created from your CSV</li>
+            <li>CSV parsed and each candidate processed individually</li>
+            <li>Candidates are created using existing API endpoint</li>
             <li>AI generates personalized questions for each candidate</li>
             <li>Test credentials are automatically sent to candidates</li>
             <li>Candidates can take their assessments immediately</li>
