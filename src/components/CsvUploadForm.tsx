@@ -81,7 +81,7 @@ const CsvUploadForm = () => {
       formData.append('batch_id', `BATCH_${Date.now()}`);
       formData.append('timestamp', new Date().toISOString());
       
-      // Add the binary CSV file - this is crucial for n8n
+      // Add the binary CSV file
       formData.append('csvFile', file, file.name);
       
       console.log('FormData entries:');
@@ -93,49 +93,29 @@ const CsvUploadForm = () => {
         }
       }
 
-      console.log('=== SENDING POST REQUEST ===');
-      console.log('Method: POST');
-      console.log('URL:', ACTIVE_WEBHOOKS.USER_CREATION);
+      console.log('=== SENDING DIRECT POST REQUEST ===');
       
-      // Use XMLHttpRequest for more control over the request
-      const xhr = new XMLHttpRequest();
-      
-      const uploadPromise = new Promise((resolve, reject) => {
-        xhr.onreadystatechange = function() {
-          if (xhr.readyState === XMLHttpRequest.DONE) {
-            console.log('XHR Response Status:', xhr.status);
-            console.log('XHR Response Text:', xhr.responseText);
-            console.log('XHR Response Headers:', xhr.getAllResponseHeaders());
-            
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(xhr.responseText);
-            } else {
-              reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText} - ${xhr.responseText}`));
-            }
-          }
-        };
-        
-        xhr.onerror = function() {
-          console.error('XHR Error occurred');
-          reject(new Error('Network error occurred'));
-        };
-        
-        xhr.ontimeout = function() {
-          console.error('XHR Timeout occurred');
-          reject(new Error('Request timeout'));
-        };
+      // Make direct POST request with fetch
+      const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'User-Agent': 'Parikshan-AI/1.0',
+        },
+        mode: 'cors',
       });
 
-      // Configure the request
-      xhr.open('POST', ACTIVE_WEBHOOKS.USER_CREATION, true);
-      xhr.setRequestHeader('User-Agent', 'Parikshan-AI/1.0');
-      xhr.timeout = 30000; // 30 second timeout
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
       
-      console.log('XHR configured - sending FormData...');
-      xhr.send(formData);
-      
-      // Wait for the upload to complete
-      await uploadPromise;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      const responseText = await response.text();
+      console.log('Response body:', responseText);
 
       console.log('=== UPLOAD SUCCESSFUL ===');
       
