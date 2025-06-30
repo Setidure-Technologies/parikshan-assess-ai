@@ -32,6 +32,49 @@ const CsvUploadForm = () => {
     }
   };
 
+  const sendWithXHR = (formData: FormData): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.open('POST', ACTIVE_WEBHOOKS.USER_CREATION, true);
+      
+      // Set headers
+      xhr.setRequestHeader('User-Agent', 'Parikshan-AI/1.0');
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      
+      // Handle response
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+          console.log('XHR Response Status:', xhr.status);
+          console.log('XHR Response Headers:', xhr.getAllResponseHeaders());
+          console.log('XHR Response Text:', xhr.responseText);
+          
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(xhr.responseText);
+          } else {
+            reject(new Error(`XHR failed: ${xhr.status} - ${xhr.statusText} - ${xhr.responseText}`));
+          }
+        }
+      };
+      
+      xhr.onerror = () => {
+        console.error('XHR Error Event');
+        reject(new Error('Network error occurred'));
+      };
+      
+      xhr.ontimeout = () => {
+        console.error('XHR Timeout');
+        reject(new Error('Request timeout'));
+      };
+      
+      // Set timeout to 30 seconds
+      xhr.timeout = 30000;
+      
+      console.log('Sending XHR request to:', ACTIVE_WEBHOOKS.USER_CREATION);
+      xhr.send(formData);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
@@ -93,30 +136,11 @@ const CsvUploadForm = () => {
         }
       }
 
-      console.log('=== SENDING REQUEST TO N8N WEBHOOK ===');
+      console.log('=== SENDING REQUEST WITH XHR ===');
       
-      // Send directly to n8n webhook
-      const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'User-Agent': 'Parikshan-AI/1.0',
-        },
-        mode: 'cors',
-      });
-
-      console.log('N8N webhook response status:', response.status);
-      console.log('N8N webhook response headers:', Object.fromEntries(response.headers.entries()));
+      // Use XMLHttpRequest for better control
+      const responseText = await sendWithXHR(formData);
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('N8N webhook error:', errorText);
-        throw new Error(`N8N webhook failed: ${response.status} - ${errorText}`);
-      }
-
-      const responseText = await response.text();
-      console.log('N8N webhook raw response:', responseText);
-
       let responseData;
       try {
         responseData = JSON.parse(responseText);
