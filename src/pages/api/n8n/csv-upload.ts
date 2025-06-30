@@ -1,7 +1,7 @@
 
 import formidable from 'formidable';
 import fs from 'fs';
-import { ACTIVE_WEBHOOKS } from '../../../src/config/webhooks';
+import { ACTIVE_WEBHOOKS } from '../../../config/webhooks';
 
 // Disable Next.js body parser to handle file uploads with formidable
 export const config = {
