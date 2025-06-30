@@ -9,6 +9,7 @@ import { Upload } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { useCompany } from '@/hooks/useCompany';
+import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
 
 const CsvUploadForm = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -54,7 +55,7 @@ const CsvUploadForm = () => {
     setLoading(true);
     try {
       console.log('=== CSV UPLOAD PROCESS STARTING ===');
-      console.log('Using local API route: /api/n8n/csv-upload');
+      console.log('Using n8n webhook:', ACTIVE_WEBHOOKS.USER_CREATION);
       console.log('Company details:', {
         companyId: company.id,
         companyName: company.name,
@@ -78,6 +79,7 @@ const CsvUploadForm = () => {
       formData.append('filename', file.name);
       formData.append('batch_id', `BATCH_${Date.now()}`);
       formData.append('timestamp', new Date().toISOString());
+      formData.append('action', 'csv_upload');
       
       // Add the binary CSV file
       formData.append('csvFile', file, file.name);
@@ -91,25 +93,38 @@ const CsvUploadForm = () => {
         }
       }
 
-      console.log('=== SENDING REQUEST TO LOCAL API ===');
+      console.log('=== SENDING REQUEST TO N8N WEBHOOK ===');
       
-      // Call the local API route instead of direct n8n webhook
-      const response = await fetch('/api/n8n/csv-upload', {
+      // Send directly to n8n webhook
+      const response = await fetch(ACTIVE_WEBHOOKS.USER_CREATION, {
         method: 'POST',
         body: formData,
+        headers: {
+          'User-Agent': 'Parikshan-AI/1.0',
+        },
+        mode: 'cors',
       });
 
-      console.log('Local API response status:', response.status);
-      console.log('Local API response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('N8N webhook response status:', response.status);
+      console.log('N8N webhook response headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Local API error:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+        console.error('N8N webhook error:', errorText);
+        throw new Error(`N8N webhook failed: ${response.status} - ${errorText}`);
       }
 
-      const responseData = await response.json();
-      console.log('Local API response body:', responseData);
+      const responseText = await response.text();
+      console.log('N8N webhook raw response:', responseText);
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('N8N webhook response body:', responseData);
+      } catch (e) {
+        console.log('Response is not JSON, treating as success');
+        responseData = { message: responseText, success: true };
+      }
 
       console.log('=== UPLOAD SUCCESSFUL ===');
       
