@@ -64,38 +64,48 @@ const CsvUploadForm = () => {
 
     setLoading(true);
     try {
-      // Create FormData for binary file upload
+      // Create FormData for direct n8n webhook call
       const formData = new FormData();
-      formData.append('csvFile', file);
-      formData.append('adminUserId', profile.id);
-      formData.append('companyId', profile.company_id);
-      formData.append('companyName', company.name);
+      formData.append('csv_file', file);
+      formData.append('admin_user_id', profile.id);
+      formData.append('company_id', profile.company_id);
+      formData.append('company_name', company.name);
       formData.append('industry', company.industry);
+      formData.append('admin_email', profile.email || '');
       formData.append('filename', file.name);
+      formData.append('action', 'bulk_create_candidates');
+      formData.append('timestamp', new Date().toISOString());
 
-      console.log('Uploading CSV with admin details:', {
-        adminUserId: profile.id,
-        companyId: profile.company_id,
-        companyName: company.name,
+      console.log('Sending CSV directly to n8n webhook with data:', {
+        admin_user_id: profile.id,
+        company_id: profile.company_id,
+        company_name: company.name,
         industry: company.industry,
-        filename: file.name
+        admin_email: profile.email,
+        filename: file.name,
+        action: 'bulk_create_candidates'
       });
 
-      const response = await fetch('/api/n8n/csv-upload', {
+      // Send directly to n8n webhook
+      const response = await fetch('https://n8n.erudites.in/webhook-test/usercreation', {
         method: 'POST',
-        body: formData, // Send as FormData for binary upload
+        body: formData, // Send as FormData for binary file upload
       });
 
-      const result = await response.json();
-      console.log('Upload response:', result);
+      console.log('N8N webhook response status:', response.status);
 
       if (!response.ok) {
-        throw new Error(result.error || 'Upload failed');
+        const errorText = await response.text();
+        console.error('N8N webhook failed:', errorText);
+        throw new Error(`N8N webhook failed: ${response.status} - ${errorText}`);
       }
 
+      const result = await response.json();
+      console.log('N8N webhook response:', result);
+
       toast({
-        title: "Upload Started",
-        description: `Processing ${result.candidates_count || 'multiple'} candidates. Questions will be generated automatically.`,
+        title: "Upload Successful",
+        description: `CSV uploaded successfully. Processing candidates and generating questions automatically.`,
       });
 
       setFile(null);
@@ -110,10 +120,10 @@ const CsvUploadForm = () => {
       }, 2000);
       
     } catch (error: any) {
-      console.error('Upload error:', error);
+      console.error('N8N webhook error:', error);
       toast({
         title: "Upload Failed",
-        description: error.message || "Failed to upload CSV file",
+        description: error.message || "Failed to upload CSV file to n8n webhook",
         variant: "destructive",
       });
     } finally {
@@ -200,18 +210,18 @@ const CsvUploadForm = () => {
             disabled={!file || loading}
             className="w-full bg-cyan-500 hover:bg-cyan-600"
           >
-            {loading ? 'Processing...' : 'Upload & Generate Tests'}
+            {loading ? 'Uploading to N8N...' : 'Upload CSV to N8N'}
           </Button>
         </form>
 
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">What happens next:</h4>
-          <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>CSV file uploaded with admin and company details</li>
-            <li>Candidates are created from your CSV</li>
+        <div className="mt-4 p-3 bg-green-50 rounded-lg">
+          <h4 className="text-sm font-medium text-green-900 mb-2">Direct N8N Integration:</h4>
+          <ol className="text-sm text-green-800 space-y-1 list-decimal list-inside">
+            <li>CSV file sent directly to n8n webhook with metadata</li>
+            <li>N8N processes CSV and creates candidates</li>
             <li>AI generates personalized questions for each candidate</li>
-            <li>Test credentials are automatically sent to candidates</li>
-            <li>Candidates can take their assessments immediately</li>
+            <li>Test credentials automatically sent to candidates</li>
+            <li>Candidates receive immediate access to assessments</li>
           </ol>
         </div>
       </CardContent>
