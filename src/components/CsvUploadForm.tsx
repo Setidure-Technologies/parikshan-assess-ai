@@ -87,7 +87,7 @@ const CsvUploadForm = () => {
       });
 
       // Send directly to n8n webhook
-      const response = await fetch('https://n8n.erudites.in/webhook-test/usercreation', {
+      const response = await fetch('https://n8n.erudites.in/webhook/usercreation', {
         method: 'POST',
         body: formData, // Send as FormData for binary file upload
       });
