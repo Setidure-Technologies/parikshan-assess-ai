@@ -1,13 +1,15 @@
 
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { TestHeader } from "@/components/test/TestHeader";
-import { QuestionRenderer } from "@/components/test/QuestionRenderer";
-import { ProgressBar } from "@/components/test/ProgressBar";
-import { SubmitEvaluation } from "@/components/test/SubmitEvaluation";
+import { TestProgress } from "@/components/test/TestProgress";
+import { QuestionCard } from "@/components/test/QuestionCard";
+import { QuestionInput } from "@/components/test/QuestionInput";
+import { TestNavigation } from "@/components/test/TestNavigation";
+import { QuestionOverview } from "@/components/test/QuestionOverview";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
@@ -25,8 +27,6 @@ interface Question {
 
 const TestSection = () => {
   const { sectionId } = useParams();
-  const [searchParams] = useSearchParams();
-  const candidateIdFromUrl = searchParams.get('candidateId');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -39,42 +39,45 @@ const TestSection = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sectionName, setSectionName] = useState('');
-  const [candidateId, setCandidateId] = useState<string | null>(null);
 
   // Load questions from database
   useEffect(() => {
     const loadQuestions = async () => {
-      if (!user || !sectionId) return;
+      if (!user) return;
       
       try {
         console.log('Loading questions for section:', sectionId);
         
-        let finalCandidateId = candidateIdFromUrl;
-        
-        // If no candidateId in URL, get it from user
-        if (!finalCandidateId) {
-          const { data: candidate, error: candidateError } = await supabase
-            .from('candidates')
-            .select('id')
-            .eq('user_id', user.id)
-            .single();
+        // Get candidate record
+        const { data: candidate, error: candidateError } = await supabase
+          .from('candidates')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
 
-          if (candidateError) {
-            console.error('Error fetching candidate:', candidateError);
-            toast({
-              title: "Error",
-              description: "Candidate record not found",
-              variant: "destructive",
-            });
-            setLoading(false);
-            return;
-          }
-
-          finalCandidateId = candidate.id;
+        if (candidateError) {
+          console.error('Error fetching candidate:', candidateError);
+          toast({
+            title: "Error",
+            description: "Candidate record not found",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
         }
 
-        console.log('Using candidate ID:', finalCandidateId);
-        setCandidateId(finalCandidateId);
+        if (!candidate) {
+          console.error('No candidate found for user:', user.id);
+          toast({
+            title: "Error",
+            description: "Candidate record not found",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        console.log('Found candidate ID:', candidate.id);
 
         // Get section info
         const { data: section, error: sectionError } = await supabase
@@ -105,7 +108,7 @@ const TestSection = () => {
           .from('questions')
           .select('*')
           .eq('section_id', sectionId)
-          .eq('candidate_id', finalCandidateId)
+          .eq('candidate_id', candidate.id)
           .order('question_number');
 
         if (questionsError) {
@@ -140,7 +143,7 @@ const TestSection = () => {
             .from('answers')
             .select('*')
             .eq('section_id', sectionId)
-            .eq('candidate_id', finalCandidateId);
+            .eq('candidate_id', candidate.id);
             
           if (!answersError && answersData && answersData.length > 0) {
             console.log('Found existing answers:', answersData.length);
@@ -149,6 +152,7 @@ const TestSection = () => {
             answersData.forEach(answer => {
               const questionIndex = formattedQuestions.findIndex(q => q.id === answer.question_id);
               if (questionIndex !== -1) {
+                // Handle different answer_data structures
                 let answerValue = answer.answer_data;
                 if (typeof answerValue === 'object' && answerValue !== null && 'value' in answerValue) {
                   answerValue = (answerValue as any).value;
@@ -175,7 +179,7 @@ const TestSection = () => {
     };
 
     loadQuestions();
-  }, [sectionId, user, toast, candidateIdFromUrl]);
+  }, [sectionId, user, toast]);
 
   // Question timer
   useEffect(() => {
@@ -184,6 +188,7 @@ const TestSection = () => {
     const timer = setInterval(() => {
       setQuestionTimeRemaining(prev => {
         if (prev <= 1) {
+          // Auto-move to next question when time runs out
           if (currentQuestion < questions.length - 1) {
             handleNext();
           }
@@ -240,11 +245,20 @@ const TestSection = () => {
   };
 
   const handleSave = async () => {
-    if (!user || !candidateId) return;
+    if (!user) return;
     
     try {
+      const { data: candidate } = await supabase
+        .from('candidates')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!candidate) return;
+
+      // Save current answers
       const answersToSave = Object.entries(answers).map(([qIndex, answer]) => ({
-        candidate_id: candidateId,
+        candidate_id: candidate.id,
         question_id: questions[parseInt(qIndex)]?.id,
         section_id: sectionId,
         answer_data: { value: answer, question_index: parseInt(qIndex) }
@@ -271,26 +285,52 @@ const TestSection = () => {
   };
 
   const handleSubmit = async () => {
-    if (!candidateId || !sectionId) return;
-    
     setIsSubmitting(true);
     await handleSave();
-
-    const submitEvaluation = SubmitEvaluation({
-      candidateId,
-      sectionId,
-      answers,
-      questions,
-      onComplete: () => {
-        setTimeout(() => {
-          navigate("/candidate-dashboard");
-        }, 1500);
-      }
-    });
-
-    await submitEvaluation.handleSubmit();
-    setIsSubmitting(false);
+    
+    setTimeout(() => {
+      toast({
+        title: "Section Completed",
+        description: `${sectionName} submitted successfully!`,
+      });
+      navigate("/candidate-dashboard");
+    }, 1500);
   };
+
+  // Question timer
+  useEffect(() => {
+    if (questionTimeRemaining <= 0) return;
+    
+    const timer = setInterval(() => {
+      setQuestionTimeRemaining(prev => {
+        if (prev <= 1) {
+          // Auto-move to next question when time runs out
+          if (currentQuestion < questions.length - 1) {
+            handleNext();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [questionTimeRemaining, currentQuestion, questions.length]);
+
+  // Total timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTotalTimeRemaining((prev) => {
+        if (prev <= 1) {
+          handleAutoSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   if (loading) {
     return (
@@ -323,6 +363,8 @@ const TestSection = () => {
     );
   }
 
+  const currentQ = questions[currentQuestion];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-white">
       <TestHeader
@@ -332,26 +374,39 @@ const TestSection = () => {
       />
 
       <div className="container mx-auto px-4 py-8">
-        <ProgressBar
+        <TestProgress
           sectionName={sectionName}
           currentQuestion={currentQuestion}
           totalQuestions={questions.length}
-          questionType={questions[currentQuestion]?.question_type || ''}
+          questionType={currentQ.question_type}
           answeredCount={Object.keys(answers).length}
-          answers={answers}
-          onQuestionSelect={handleQuestionSelect}
         />
 
-        <QuestionRenderer
-          questions={questions}
+        <QuestionCard
+          question={currentQ}
+          questionNumber={currentQuestion + 1}
+          timeRemaining={questionTimeRemaining}
+        >
+          <QuestionInput
+            question={currentQ}
+            answer={answers[currentQuestion]}
+            onAnswerChange={(answer) => handleAnswerChange(currentQuestion, answer)}
+          />
+        </QuestionCard>
+
+        <TestNavigation
+          currentQuestion={currentQuestion}
+          totalQuestions={questions.length}
+          isSubmitting={isSubmitting}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onSubmit={handleSubmit}
+        />
+
+        <QuestionOverview
+          totalQuestions={questions.length}
           currentQuestion={currentQuestion}
           answers={answers}
-          questionTimeRemaining={questionTimeRemaining}
-          isSubmitting={isSubmitting}
-          onAnswerChange={handleAnswerChange}
-          onNext={handleNext}
-          onPrevious={handlePrevious}
-          onSubmit={handleSubmit}
           onQuestionSelect={handleQuestionSelect}
         />
       </div>

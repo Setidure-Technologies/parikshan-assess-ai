@@ -60,7 +60,7 @@ const App = () => (
               } 
             />
             <Route 
-              path="/test-section/:sectionId" 
+              path="/test-section" 
               element={
                 <ProtectedRoute allowedRoles={['candidate']}>
                   <TestSection />

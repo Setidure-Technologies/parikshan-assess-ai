@@ -4,43 +4,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { User, Play, RotateCcw, FileText, Clock, CheckCircle } from 'lucide-react';
+import { User, Play, RotateCcw, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuestions } from '@/hooks/useQuestions';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ACTIVE_WEBHOOKS } from '@/config/webhooks';
-import { Tables } from '@/integrations/supabase/types';
-import DashboardHeader from '@/components/dashboard/DashboardHeader';
-
-// Use the actual database type and extend it with our computed properties
-interface Section extends Tables<'sections'> {
-  question_count: number;
-  completed_answers: number;
-}
 
 const CandidateDashboard = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [candidateId, setCandidateId] = useState<string | null>(null);
-  const [sections, setSections] = useState<Section[]>([]);
   const [testSessions, setTestSessions] = useState<any[]>([]);
+  const [answers, setAnswers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSubmittingFinal, setIsSubmittingFinal] = useState(false);
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      localStorage.clear();
-      sessionStorage.clear();
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Force navigation even if signOut fails
-      navigate('/login');
-    }
-  };
+  const { questions } = useQuestions(candidateId);
 
   useEffect(() => {
     if (!user) return;
@@ -56,63 +35,6 @@ const CandidateDashboard = () => {
 
         if (candidateError) throw candidateError;
         setCandidateId(candidate.id);
-        console.log('Found candidate ID:', candidate.id);
-
-        // Get all sections
-        const { data: allSections, error: sectionsError } = await supabase
-          .from('sections')
-          .select('*')
-          .order('display_order');
-
-        if (sectionsError) throw sectionsError;
-
-        // For each section, check if questions exist for this candidate
-        const sectionsWithData = await Promise.all(
-          (allSections || []).map(async (section) => {
-            // Get question count for this section and candidate
-            const { data: questions, error: questionsError } = await supabase
-              .from('questions')
-              .select('id')
-              .eq('section_id', section.id)
-              .eq('candidate_id', candidate.id);
-
-            if (questionsError) {
-              console.error('Error fetching questions for section:', section.name, questionsError);
-              return null;
-            }
-
-            // Get completed answers count for this section and candidate
-            const { data: answers, error: answersError } = await supabase
-              .from('answers')
-              .select('id')
-              .eq('section_id', section.id)
-              .eq('candidate_id', candidate.id);
-
-            if (answersError) {
-              console.error('Error fetching answers for section:', section.name, answersError);
-            }
-
-            const questionCount = questions?.length || 0;
-            const answersCount = answers?.length || 0;
-
-            console.log(`Section ${section.name}: ${questionCount} questions, ${answersCount} answers`);
-
-            return {
-              ...section,
-              question_count: questionCount,
-              completed_answers: answersCount
-            };
-          })
-        );
-
-        // Filter out null results and sections without questions
-        const availableSections = sectionsWithData
-          .filter((section): section is Section => 
-            section !== null && section.question_count > 0
-          );
-
-        console.log('Available sections:', availableSections.map(s => s.name));
-        setSections(availableSections);
 
         // Get test sessions
         const { data: sessions, error: sessionsError } = await supabase
@@ -123,8 +45,16 @@ const CandidateDashboard = () => {
         if (sessionsError) throw sessionsError;
         setTestSessions(sessions || []);
 
+        // Get answers
+        const { data: answersData, error: answersError } = await supabase
+          .from('answers')
+          .select('*')
+          .eq('candidate_id', candidate.id);
+
+        if (answersError) throw answersError;
+        setAnswers(answersData || []);
+
       } catch (error: any) {
-        console.error('Error fetching candidate data:', error);
         toast({
           title: "Error",
           description: error.message,
@@ -138,271 +68,55 @@ const CandidateDashboard = () => {
     fetchCandidateData();
   }, [user, toast]);
 
-  const getSectionProgress = (section: Section) => {
-    if (section.question_count === 0) return 0;
-    return Math.round((section.completed_answers / section.question_count) * 100);
+  const getTestProgress = () => {
+    if (questions.length === 0) return 0;
+    return Math.round((answers.length / questions.length) * 100);
   };
 
-  const getSectionStatus = (section: Section) => {
-    if (section.question_count === 0) return 'not_available';
-    if (section.completed_answers === 0) return 'not_started';
-    if (section.completed_answers < section.question_count) return 'in_progress';
+  const getTestStatus = () => {
+    if (questions.length === 0) return 'pending';
+    if (answers.length === 0) return 'not_started';
+    if (answers.length < questions.length) return 'in_progress';
     return 'completed';
   };
 
-  const canRetrySection = (sectionId: string) => {
-    const completedSessions = testSessions.filter(s => 
-      s.section_id === sectionId && s.status === 'completed'
-    );
+  const canRetry = () => {
+    const completedSessions = testSessions.filter(s => s.status === 'completed');
     return completedSessions.length > 0 && completedSessions.length < 2;
   };
 
-  const areAllSectionsCompleted = () => {
-    return sections.length > 0 && sections.every(section => getSectionStatus(section) === 'completed');
-  };
-
-  const handleStartTest = (sectionId: string) => {
+  const handleStartTest = () => {
     if (candidateId) {
-      navigate(`/test-section/${sectionId}?candidateId=${candidateId}`);
+      navigate(`/test-section?candidateId=${candidateId}`);
     }
   };
 
-  const handleRetryTest = async (sectionId: string) => {
+  const handleRetryTest = async () => {
     if (!candidateId) return;
 
     try {
-      // Clear previous answers for this section
+      // Clear previous answers
       await supabase
         .from('answers')
         .delete()
-        .eq('candidate_id', candidateId)
-        .eq('section_id', sectionId);
+        .eq('candidate_id', candidateId);
 
       // Create new test session
       await supabase
         .from('test_sessions')
         .insert({
           candidate_id: candidateId,
-          section_id: sectionId,
-          attempt: testSessions.filter(s => s.section_id === sectionId).length + 1,
+          section_id: questions[0]?.section_id,
+          attempt: testSessions.length + 1,
         });
 
-      navigate(`/test-section/${sectionId}?candidateId=${candidateId}`);
+      navigate(`/test-section?candidateId=${candidateId}`);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-    }
-  };
-
-  const handleFinalSubmission = async () => {
-    if (!candidateId || !user) return;
-
-    setIsSubmittingFinal(true);
-
-    try {
-      // Get comprehensive candidate and test data with ALL metadata
-      const { data: candidate, error: candidateError } = await supabase
-        .from('candidates')
-        .select(`
-          *,
-          companies (
-            id,
-            name,
-            email,
-            industry,
-            created_at
-          )
-        `)
-        .eq('id', candidateId)
-        .single();
-
-      if (candidateError) throw candidateError;
-
-      // Get all answers with comprehensive section and question details
-      const { data: allAnswers, error: answersError } = await supabase
-        .from('answers')
-        .select(`
-          *,
-          sections (
-            id,
-            name,
-            description,
-            time_limit_minutes,
-            created_at
-          ),
-          questions (
-            id,
-            question_text,
-            question_type,
-            options,
-            metadata,
-            created_at
-          )
-        `)
-        .eq('candidate_id', candidateId);
-
-      if (answersError) throw answersError;
-
-      // Get all test sessions with metadata
-      const { data: allSessions, error: sessionsError } = await supabase
-        .from('test_sessions')
-        .select(`
-          *,
-          sections (
-            id,
-            name,
-            description
-          )
-        `)
-        .eq('candidate_id', candidateId);
-
-      if (sessionsError) throw sessionsError;
-
-      // Calculate comprehensive statistics
-      const totalTimeSpent = allSessions?.reduce((total, session) => {
-        return total + (session.total_time_seconds || 0);
-      }, 0) || 0;
-
-      const totalQuestions = sections.reduce((sum, section) => sum + section.question_count, 0);
-      const totalAnswers = sections.reduce((sum, section) => sum + section.completed_answers, 0);
-      const completionPercentage = totalQuestions > 0 ? Math.round((totalAnswers / totalQuestions) * 100) : 0;
-
-      // Prepare comprehensive submission data with ALL metadata
-      const submissionData = {
-        // Candidate Information
-        candidate_id: candidateId,
-        candidate_email: candidate.email,
-        candidate_name: candidate.full_name,
-        candidate_phone: candidate.phone,
-        candidate_profile_data: candidate.profile_data,
-        candidate_created_at: candidate.created_at,
-        candidate_test_status: 'completed',
-        user_id: user.id,
-        user_metadata: user.user_metadata,
-
-        // Company Information
-        company_id: candidate.company_id,
-        company_name: candidate.companies?.name,
-        company_email: candidate.companies?.email,
-        company_industry: candidate.companies?.industry,
-        company_created_at: candidate.companies?.created_at,
-
-        // Test Statistics
-        sections_completed: sections.length,
-        total_questions: totalQuestions,
-        total_answers: totalAnswers,
-        completion_percentage: completionPercentage,
-        total_time_spent_seconds: totalTimeSpent,
-        total_time_spent_minutes: Math.round(totalTimeSpent / 60),
-
-        // Detailed Answers with Full Context
-        answers: allAnswers?.map(answer => ({
-          ...answer,
-          section_details: answer.sections,
-          question_details: answer.questions,
-          time_per_question: answer.time_taken_seconds || 0
-        })),
-
-        // Test Sessions with Metadata
-        test_sessions: allSessions?.map(session => ({
-          ...session,
-          section_details: session.sections,
-          duration_minutes: session.total_time_seconds ? Math.round(session.total_time_seconds / 60) : 0
-        })),
-
-        // Section Analysis
-        sections_data: sections,
-        section_breakdown: sections.map(section => ({
-          section_id: section.id,
-          section_name: section.name,
-          section_description: section.description,
-          time_limit_minutes: section.time_limit_minutes,
-          questions_count: section.question_count,
-          answers_count: section.completed_answers,
-          completion_percentage: getSectionProgress(section),
-          status: getSectionStatus(section),
-          section_answers: allAnswers?.filter(answer => answer.section_id === section.id) || []
-        })),
-
-        // Submission Metadata
-        submission_timestamp: new Date().toISOString(),
-        test_status: 'completed',
-        submitted_from: window.location.origin,
-        platform: 'web',
-        browser_info: navigator.userAgent,
-        
-        // Performance Metrics
-        average_time_per_question: totalAnswers > 0 ? Math.round(totalTimeSpent / totalAnswers) : 0,
-        questions_attempted: totalAnswers,
-        questions_skipped: totalQuestions - totalAnswers,
-        
-        // Additional Context
-        submission_method: 'final_dashboard_submission',
-        all_sections_completed: areAllSectionsCompleted(),
-        retry_count: testSessions.length,
-        total_attempts: testSessions.reduce((sum, session) => sum + (session.attempt || 0), 0)
-      };
-
-      console.log('Submitting COMPREHENSIVE test data to n8n:', submissionData);
-
-      // Send to n8n webhook with enhanced headers
-      const webhookResponse = await fetch(ACTIVE_WEBHOOKS.TEST_EVALUATION, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Candidate-ID': candidateId,
-          'X-Company-ID': candidate.company_id,
-          'X-User-ID': user.id,
-          'X-Submission-Time': new Date().toISOString(),
-          'X-Total-Questions': totalQuestions.toString(),
-          'X-Total-Answers': totalAnswers.toString(),
-          'X-Completion-Percentage': completionPercentage.toString(),
-          'X-Platform': 'web-dashboard',
-        },
-        body: JSON.stringify(submissionData),
-      });
-
-      if (!webhookResponse.ok) {
-        const errorText = await webhookResponse.text();
-        console.error('Webhook response error:', errorText);
-        throw new Error(`Failed to submit test for evaluation: ${webhookResponse.status} ${webhookResponse.statusText}`);
-      }
-
-      const webhookResult = await webhookResponse.json();
-      console.log('N8N webhook success response:', webhookResult);
-
-      // Update candidate status in database
-      await supabase
-        .from('candidates')
-        .update({ 
-          test_status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', candidateId);
-
-      toast({
-        title: "Test Submitted Successfully!",
-        description: "Your comprehensive test data has been submitted for evaluation. You will be notified of the results.",
-      });
-
-      // Refresh the page to show updated status
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-
-    } catch (error: any) {
-      console.error('Error submitting final test:', error);
-      toast({
-        title: "Submission Error",
-        description: error.message || "Failed to submit test. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmittingFinal(false);
     }
   };
 
@@ -414,176 +128,125 @@ const CandidateDashboard = () => {
     );
   }
 
+  const testStatus = getTestStatus();
+  const progress = getTestProgress();
+
   return (
-    <div className="min-h-screen bg-stone-50">
-      <DashboardHeader 
-        onLogout={handleLogout} 
-        userName={user?.user_metadata?.full_name || user?.email} 
-      />
-      
-      <div className="p-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Candidate Dashboard</h1>
-            <p className="text-gray-600">Welcome back! Here are your available assessments.</p>
-          </div>
+    <div className="min-h-screen bg-stone-50 p-4">
+      <div className="container mx-auto max-w-4xl">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Candidate Dashboard</h1>
+          <p className="text-gray-600">Welcome back! Here's your test progress.</p>
+        </div>
 
-          {/* Final Submission Button */}
-          {areAllSectionsCompleted() && (
-            <Card className="mb-6 border-green-200 bg-green-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-green-700">
-                  <CheckCircle className="h-5 w-5" />
-                  All Sections Completed!
-                </CardTitle>
-                <CardDescription>
-                  You have completed all test sections. Click below to submit your final test with complete metadata for evaluation.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={handleFinalSubmission}
-                  disabled={isSubmittingFinal}
-                  className="bg-green-600 hover:bg-green-700"
-                  size="lg"
-                >
-                  {isSubmittingFinal ? "Submitting Complete Data..." : "Submit Final Test with All Metadata"}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Profile Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-cyan-600">
-                  <User className="h-5 w-5" />
-                  Profile
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={() => navigate('/candidate-profile')} 
-                  variant="outline" 
-                  className="w-full"
-                >
-                  Edit Profile
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Assessment Sections */}
-            {sections.map((section) => {
-              const progress = getSectionProgress(section);
-              const status = getSectionStatus(section);
-              
-              return (
-                <Card key={section.id} className="col-span-full lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-cyan-600">
-                      <Play className="h-5 w-5" />
-                      {section.name}
-                    </CardTitle>
-                    <CardDescription>
-                      {section.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {section.time_limit_minutes} minutes
-                      </span>
-                      <span>{section.completed_answers} of {section.question_count} questions</span>
-                    </div>
-                    
-                    <Progress value={progress} className="h-2" />
-                    
-                    <div className="flex items-center justify-between">
-                      <Badge variant={
-                        status === 'completed' ? 'default' :
-                        status === 'in_progress' ? 'secondary' :
-                        status === 'not_started' ? 'outline' : 'destructive'
-                      }>
-                        {status === 'completed' ? 'Completed' :
-                         status === 'in_progress' ? 'In Progress' :
-                         status === 'not_started' ? 'Not Started' : 'Not Available'}
-                      </Badge>
-                      
-                      <div className="flex gap-2">
-                        {status === 'completed' && canRetrySection(section.id) && (
-                          <Button 
-                            onClick={() => handleRetryTest(section.id)} 
-                            variant="outline" 
-                            size="sm"
-                          >
-                            <RotateCcw className="h-4 w-4 mr-2" />
-                            Retry
-                          </Button>
-                        )}
-                        {(status === 'not_started' || status === 'in_progress') && (
-                          <Button 
-                            onClick={() => handleStartTest(section.id)} 
-                            className="bg-cyan-500 hover:bg-cyan-600"
-                            size="sm"
-                          >
-                            <Play className="h-4 w-4 mr-2" />
-                            {status === 'not_started' ? 'Start' : 'Continue'}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-
-            {sections.length === 0 && (
-              <Card className="col-span-full">
-                <CardContent className="text-center py-8">
-                  <p className="text-gray-500">No assessments are available yet. Please wait for your tests to be generated.</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Test History */}
-            <Card className="col-span-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-cyan-600">
-                  <FileText className="h-5 w-5" />
-                  Test History
-                </CardTitle>
-                <CardDescription>
-                  Your previous test attempts
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {testSessions.length > 0 ? (
-                  <div className="space-y-2">
-                    {testSessions.map((session, index) => {
-                      const section = sections.find(s => s.id === session.section_id);
-                      return (
-                        <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                          <div>
-                            <span className="font-medium">{section?.name || 'Unknown Section'} - Attempt {session.attempt || index + 1}</span>
-                            <p className="text-sm text-gray-500">
-                              {session.started_at ? new Date(session.started_at).toLocaleDateString() : 'Not started'}
-                            </p>
-                          </div>
-                          <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
-                            {session.status || 'In Progress'}
-                          </Badge>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No test sessions yet</p>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Test Progress Card */}
+          <Card className="col-span-full lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-cyan-600">
+                <Play className="h-5 w-5" />
+                Test Progress
+              </CardTitle>
+              <CardDescription>
+                Your current progress through the assessment
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Progress</span>
+                <span className="text-sm text-gray-500">{answers.length} of {questions.length} questions</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <div className="flex items-center gap-2">
+                <Badge variant={
+                  testStatus === 'completed' ? 'default' :
+                  testStatus === 'in_progress' ? 'secondary' :
+                  testStatus === 'not_started' ? 'outline' : 'destructive'
+                }>
+                  {testStatus === 'completed' ? 'Completed' :
+                   testStatus === 'in_progress' ? 'In Progress' :
+                   testStatus === 'not_started' ? 'Not Started' : 'Pending'}
+                </Badge>
+                {questions.length > 0 && (
+                  <span className="text-sm text-gray-500">
+                    {questions.length} questions available
+                  </span>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+              <div className="flex gap-2">
+                {testStatus === 'completed' && canRetry() && (
+                  <Button onClick={handleRetryTest} variant="outline" className="flex-1">
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Retry Test
+                  </Button>
+                )}
+                {(testStatus === 'not_started' || testStatus === 'in_progress') && questions.length > 0 && (
+                  <Button onClick={handleStartTest} className="flex-1 bg-cyan-500 hover:bg-cyan-600">
+                    <Play className="h-4 w-4 mr-2" />
+                    {testStatus === 'not_started' ? 'Start Test' : 'Continue Test'}
+                  </Button>
+                )}
+                {questions.length === 0 && (
+                  <div className="text-sm text-gray-500 p-4 bg-gray-100 rounded">
+                    No questions available yet. Please wait for your test to be generated.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Profile Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-cyan-600">
+                <User className="h-5 w-5" />
+                Profile
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => navigate('/candidate-profile')} 
+                variant="outline" 
+                className="w-full"
+              >
+                Edit Profile
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Results Card */}
+          <Card className="col-span-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-cyan-600">
+                <FileText className="h-5 w-5" />
+                Test History
+              </CardTitle>
+              <CardDescription>
+                Your previous test attempts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {testSessions.length > 0 ? (
+                <div className="space-y-2">
+                  {testSessions.map((session, index) => (
+                    <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                      <div>
+                        <span className="font-medium">Attempt {session.attempt || index + 1}</span>
+                        <p className="text-sm text-gray-500">
+                          {session.started_at ? new Date(session.started_at).toLocaleDateString() : 'Not started'}
+                        </p>
+                      </div>
+                      <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
+                        {session.status || 'In Progress'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500">No test sessions yet</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

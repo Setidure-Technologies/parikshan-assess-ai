@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
@@ -17,7 +17,6 @@ const DashboardContent = () => {
   const { profile, loading: profileLoading } = useProfile();
   const { company, loading: companyLoading } = useCompany(profile);
   const { candidates, loading: candidatesLoading, refetch } = useCandidates(profile);
-  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
 
   const loading = profileLoading || companyLoading || candidatesLoading;
 
@@ -102,11 +101,7 @@ const DashboardContent = () => {
 
       <div className="grid lg:grid-cols-2 gap-6">
         <CsvUploadForm />
-        <CandidatesList
-          candidatesData={candidates}
-          selectedCandidates={selectedCandidates}
-          setSelectedCandidates={setSelectedCandidates}
-        />
+        <CandidatesList candidatesData={candidates} />
       </div>
     </div>
   );

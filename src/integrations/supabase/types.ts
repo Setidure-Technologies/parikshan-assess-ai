@@ -270,6 +270,7 @@ export type Database = {
           question_text: string
           question_type: Database["public"]["Enums"]["question_type"]
           section_id: string
+          template_id: string | null
           time_limit_seconds: number | null
         }
         Insert: {
@@ -284,6 +285,7 @@ export type Database = {
           question_text: string
           question_type: Database["public"]["Enums"]["question_type"]
           section_id: string
+          template_id?: string | null
           time_limit_seconds?: number | null
         }
         Update: {
@@ -298,6 +300,7 @@ export type Database = {
           question_text?: string
           question_type?: Database["public"]["Enums"]["question_type"]
           section_id?: string
+          template_id?: string | null
           time_limit_seconds?: number | null
         }
         Relationships: [
@@ -320,6 +323,13 @@ export type Database = {
             columns: ["section_id"]
             isOneToOne: false
             referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "question_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -425,18 +435,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      assign_user_role: {
-        Args: { target_user_id: string; new_role: string }
-        Returns: undefined
-      }
-      is_admin: {
-        Args: { user_id?: string }
-        Returns: boolean
-      }
-      promote_user_to_admin: {
-        Args: { user_email: string }
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       difficulty_level: "easy" | "moderate" | "hard"
@@ -452,14 +451,7 @@ export type Database = {
         | "questions_generated"
         | "in_progress"
         | "completed"
-      user_role:
-        | "admin"
-        | "candidate"
-        | "patient"
-        | "survivor"
-        | "caregiver"
-        | "volunteer"
-        | "ngo"
+      user_role: "admin" | "candidate"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -590,15 +582,7 @@ export const Constants = {
         "in_progress",
         "completed",
       ],
-      user_role: [
-        "admin",
-        "candidate",
-        "patient",
-        "survivor",
-        "caregiver",
-        "volunteer",
-        "ngo",
-      ],
+      user_role: ["admin", "candidate"],
     },
   },
 } as const

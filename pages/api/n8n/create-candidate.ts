@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { ACTIVE_WEBHOOKS, makeWebhookRequest } from '@/config/webhooks';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -40,27 +39,27 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // Call n8n webhook using the proper webhook configuration
-    try {
-      const webhookData = {
-        email,
-        full_name,
-        user_id,
-        company_id,
-        action: 'create_candidate'
-      };
-
-      console.log('Calling n8n webhook with data:', webhookData);
-      const response = await makeWebhookRequest(ACTIVE_WEBHOOKS.USER_CREATION, webhookData);
-      
-      if (response.ok) {
-        console.log('Successfully called n8n webhook');
-      } else {
-        console.error('n8n webhook returned non-ok status:', response.status);
+    // Call n8n webhook
+    const webhookUrl = process.env.VITE_N8N_WEBHOOK_URL;
+    if (webhookUrl) {
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            full_name,
+            user_id,
+            company_id,
+            action: 'create_candidate'
+          }),
+        });
+      } catch (webhookError) {
+        console.error('Error calling n8n webhook:', webhookError);
+        // Don't fail the request if webhook fails
       }
-    } catch (webhookError) {
-      console.error('Error calling n8n webhook:', webhookError);
-      // Don't fail the request if webhook fails
     }
 
     res.status(200).json({ success: true });
