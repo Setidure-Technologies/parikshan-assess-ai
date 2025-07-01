@@ -1,76 +1,45 @@
 
+import formidable from 'formidable';
+import fs from 'fs';
+
+// Disable Next.js body parser to handle file uploads with formidable
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    console.log('CSV upload request received');
+    console.log('CSV upload request received, processing with formidable.');
     
-    // Use your actual n8n webhook URL
     const webhookUrl = 'https://n8n.erudites.in/webhook-test/476f1370-870d-459e-8be0-8ab3d86ff69a';
     
     if (!webhookUrl) {
+      console.error('N8N webhook URL not configured');
       return res.status(500).json({ error: 'N8N webhook URL not configured' });
     }
 
-    // Handle FormData upload (binary file)
-    let formData = new FormData();
-    let csvContent = '';
-    let adminUserId = '';
-    let companyId = '';
-    let companyName = '';
-    let industry = '';
-    let filename = '';
+    const form = formidable({});
+    const [fields, files] = await form.parse(req);
 
-    // Check if it's FormData (binary upload) or JSON
-    const contentType = req.headers['content-type'] || '';
-    
-    if (contentType.includes('multipart/form-data')) {
-      // This is a FormData upload, extract the data
-      // Note: In a real implementation, you'd use a multipart parser like 'multiparty' or 'formidable'
-      // For now, let's handle it as a simpler approach by reading the raw body
-      
-      // Extract form fields from the request body
-      const body = await new Promise((resolve) => {
-        let data = '';
-        req.on('data', chunk => {
-          data += chunk;
-        });
-        req.on('end', () => {
-          resolve(data);
-        });
-      });
+    // Extract fields. Formidable puts them in arrays.
+    const adminUserId = fields.adminUserId?.[0];
+    const companyId = fields.companyId?.[0];
+    const companyName = fields.companyName?.[0];
+    const industry = fields.industry?.[0];
+    const filename = fields.filename?.[0];
 
-      // Parse the multipart data (simplified approach)
-      const bodyStr = body.toString();
-      
-      // Extract admin details from form data
-      const adminUserIdMatch = bodyStr.match(/name="adminUserId"\r?\n\r?\n([^\r\n]+)/);
-      const companyIdMatch = bodyStr.match(/name="companyId"\r?\n\r?\n([^\r\n]+)/);
-      const companyNameMatch = bodyStr.match(/name="companyName"\r?\n\r?\n([^\r\n]+)/);
-      const industryMatch = bodyStr.match(/name="industry"\r?\n\r?\n([^\r\n]+)/);
-      const filenameMatch = bodyStr.match(/name="filename"\r?\n\r?\n([^\r\n]+)/);
-      
-      adminUserId = adminUserIdMatch ? adminUserIdMatch[1] : '';
-      companyId = companyIdMatch ? companyIdMatch[1] : '';
-      companyName = companyNameMatch ? companyNameMatch[1] : '';
-      industry = industryMatch ? industryMatch[1] : '';
-      filename = filenameMatch ? filenameMatch[1] : '';
+    // Extract file
+    const csvFile = files.csvFile?.[0];
 
-      // Extract CSV content
-      const csvMatch = bodyStr.match(/filename="[^"]*\.csv"[^\r\n]*\r?\n[^\r\n]*\r?\n\r?\n([\s\S]*?)\r?\n------/);
-      csvContent = csvMatch ? csvMatch[1].trim() : '';
-      
-    } else {
-      // Handle JSON format (fallback)
-      const body = req.body;
-      csvContent = body.csvContent || '';
-      companyId = body.companyId || '';
-      adminUserId = body.adminUserId || '';
-      companyName = body.companyName || '';
-      industry = body.industry || '';
-      filename = body.filename || '';
+    if (!csvFile) {
+        console.error('No CSV file found in form data');
+        return res.status(400).json({ error: 'No CSV file uploaded.' });
     }
 
     console.log('Extracted data:', { 
@@ -78,19 +47,28 @@ export default async function handler(req: any, res: any) {
       companyId, 
       companyName, 
       industry, 
-      filename,
-      csvContentLength: csvContent.length 
+      filename: filename || csvFile.originalFilename,
+      uploadedFile: csvFile.originalFilename
     });
-    
-    if (!csvContent || !companyId || !adminUserId) {
+
+    if (!companyId || !adminUserId) {
       return res.status(400).json({ 
-        error: 'Missing required data: csvContent, companyId, or adminUserId' 
+        error: 'Missing required data: companyId, or adminUserId' 
       });
+    }
+
+    // Read the content of the uploaded CSV file
+    const csvContent = fs.readFileSync(csvFile.filepath, 'utf8');
+
+    if (!csvContent) {
+      return res.status(400).json({ error: 'CSV file is empty.' });
     }
 
     // Parse CSV content into candidate records
     const lines = csvContent.split('\n').filter((line: string) => line.trim());
-    const headers = lines[0] ? lines[0].split(',').map((h: string) => h.trim().toLowerCase()) : [];
+    if (lines.length < 2) {
+      return res.status(400).json({ error: 'CSV must have a header and at least one data row.' });
+    }
     
     const candidates = [];
     for (let i = 1; i < lines.length; i++) {
@@ -106,7 +84,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    console.log('Parsed candidates:', candidates);
+    console.log(`Parsed ${candidates.length} candidates from CSV.`);
 
     // Prepare payload for n8n webhook
     const webhookPayload = {
@@ -116,11 +94,11 @@ export default async function handler(req: any, res: any) {
       admin_user_id: adminUserId,
       company_name: companyName,
       industry: industry,
-      filename: filename,
+      filename: filename || csvFile.originalFilename, // Use original filename if available
       timestamp: new Date().toISOString()
     };
 
-    console.log('Sending to n8n webhook:', webhookPayload);
+    console.log('Sending to n8n webhook:', JSON.stringify(webhookPayload, null, 2));
 
     // Send to n8n webhook
     const response = await fetch(webhookUrl, {

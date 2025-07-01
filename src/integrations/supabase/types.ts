@@ -270,7 +270,6 @@ export type Database = {
           question_text: string
           question_type: Database["public"]["Enums"]["question_type"]
           section_id: string
-          template_id: string | null
           time_limit_seconds: number | null
         }
         Insert: {
@@ -285,7 +284,6 @@ export type Database = {
           question_text: string
           question_type: Database["public"]["Enums"]["question_type"]
           section_id: string
-          template_id?: string | null
           time_limit_seconds?: number | null
         }
         Update: {
@@ -300,7 +298,6 @@ export type Database = {
           question_text?: string
           question_type?: Database["public"]["Enums"]["question_type"]
           section_id?: string
-          template_id?: string | null
           time_limit_seconds?: number | null
         }
         Relationships: [
@@ -323,13 +320,6 @@ export type Database = {
             columns: ["section_id"]
             isOneToOne: false
             referencedRelation: "sections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "questions_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "question_templates"
             referencedColumns: ["id"]
           },
         ]
