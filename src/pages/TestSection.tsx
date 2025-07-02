@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -43,7 +42,7 @@ const TestSection = () => {
   // Load questions from database
   useEffect(() => {
     const loadQuestions = async () => {
-      if (!user) return;
+      if (!user || !sectionId) return;
       
       try {
         console.log('Loading questions for section:', sectionId);

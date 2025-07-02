@@ -4,22 +4,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { User, Play, RotateCcw, FileText } from 'lucide-react';
+import { User, Play, RotateCcw, FileText, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useQuestions } from '@/hooks/useQuestions';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+
+interface Section {
+  id: string;
+  name: string;
+  description: string;
+  time_limit_minutes: number;
+  question_count: number;
+  answered_count: number;
+  status: 'not_started' | 'in_progress' | 'completed';
+}
 
 const CandidateDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [candidateId, setCandidateId] = useState<string | null>(null);
-  const [testSessions, setTestSessions] = useState<any[]>([]);
-  const [answers, setAnswers] = useState<any[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
-  const { questions } = useQuestions(candidateId);
 
   useEffect(() => {
     if (!user) return;
@@ -36,23 +43,68 @@ const CandidateDashboard = () => {
         if (candidateError) throw candidateError;
         setCandidateId(candidate.id);
 
-        // Get test sessions
-        const { data: sessions, error: sessionsError } = await supabase
-          .from('test_sessions')
+        // Get all sections
+        const { data: allSections, error: sectionsError } = await supabase
+          .from('sections')
           .select('*')
-          .eq('candidate_id', candidate.id);
+          .order('display_order');
 
-        if (sessionsError) throw sessionsError;
-        setTestSessions(sessions || []);
+        if (sectionsError) throw sectionsError;
 
-        // Get answers
-        const { data: answersData, error: answersError } = await supabase
-          .from('answers')
-          .select('*')
-          .eq('candidate_id', candidate.id);
+        // For each section, get question count and answers count
+        const sectionsWithProgress: Section[] = [];
+        
+        for (const section of allSections || []) {
+          // Get questions for this section and candidate
+          const { data: questions, error: questionsError } = await supabase
+            .from('questions')
+            .select('id')
+            .eq('section_id', section.id)
+            .eq('candidate_id', candidate.id);
 
-        if (answersError) throw answersError;
-        setAnswers(answersData || []);
+          if (questionsError) {
+            console.error('Error fetching questions for section:', section.id, questionsError);
+            continue;
+          }
+
+          // Get answers for this section and candidate
+          const { data: answers, error: answersError } = await supabase
+            .from('answers')
+            .select('id')
+            .eq('section_id', section.id)
+            .eq('candidate_id', candidate.id);
+
+          if (answersError) {
+            console.error('Error fetching answers for section:', section.id, answersError);
+            continue;
+          }
+
+          const questionCount = questions?.length || 0;
+          const answeredCount = answers?.length || 0;
+
+          let status: 'not_started' | 'in_progress' | 'completed' = 'not_started';
+          if (questionCount === 0) {
+            status = 'not_started';
+          } else if (answeredCount === 0) {
+            status = 'not_started';
+          } else if (answeredCount < questionCount) {
+            status = 'in_progress';
+          } else {
+            status = 'completed';
+          }
+
+          sectionsWithProgress.push({
+            id: section.id,
+            name: section.name,
+            description: section.description || '',
+            time_limit_minutes: section.time_limit_minutes || 30,
+            question_count: questionCount,
+            answered_count: answeredCount,
+            status
+          });
+        }
+
+        setSections(sectionsWithProgress);
 
       } catch (error: any) {
         toast({
@@ -68,56 +120,13 @@ const CandidateDashboard = () => {
     fetchCandidateData();
   }, [user, toast]);
 
-  const getTestProgress = () => {
-    if (questions.length === 0) return 0;
-    return Math.round((answers.length / questions.length) * 100);
+  const handleStartSection = (sectionId: string) => {
+    navigate(`/test-section/${sectionId}`);
   };
 
-  const getTestStatus = () => {
-    if (questions.length === 0) return 'pending';
-    if (answers.length === 0) return 'not_started';
-    if (answers.length < questions.length) return 'in_progress';
-    return 'completed';
-  };
-
-  const canRetry = () => {
-    const completedSessions = testSessions.filter(s => s.status === 'completed');
-    return completedSessions.length > 0 && completedSessions.length < 2;
-  };
-
-  const handleStartTest = () => {
-    if (candidateId) {
-      navigate(`/test-section?candidateId=${candidateId}`);
-    }
-  };
-
-  const handleRetryTest = async () => {
-    if (!candidateId) return;
-
-    try {
-      // Clear previous answers
-      await supabase
-        .from('answers')
-        .delete()
-        .eq('candidate_id', candidateId);
-
-      // Create new test session
-      await supabase
-        .from('test_sessions')
-        .insert({
-          candidate_id: candidateId,
-          section_id: questions[0]?.section_id,
-          attempt: testSessions.length + 1,
-        });
-
-      navigate(`/test-section?candidateId=${candidateId}`);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+  const getProgressPercentage = (section: Section) => {
+    if (section.question_count === 0) return 0;
+    return Math.round((section.answered_count / section.question_count) * 100);
   };
 
   if (loading) {
@@ -128,9 +137,6 @@ const CandidateDashboard = () => {
     );
   }
 
-  const testStatus = getTestStatus();
-  const progress = getTestProgress();
-
   return (
     <div className="min-h-screen bg-stone-50 p-4">
       <div className="container mx-auto max-w-4xl">
@@ -140,61 +146,6 @@ const CandidateDashboard = () => {
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Test Progress Card */}
-          <Card className="col-span-full lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-cyan-600">
-                <Play className="h-5 w-5" />
-                Test Progress
-              </CardTitle>
-              <CardDescription>
-                Your current progress through the assessment
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Progress</span>
-                <span className="text-sm text-gray-500">{answers.length} of {questions.length} questions</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <div className="flex items-center gap-2">
-                <Badge variant={
-                  testStatus === 'completed' ? 'default' :
-                  testStatus === 'in_progress' ? 'secondary' :
-                  testStatus === 'not_started' ? 'outline' : 'destructive'
-                }>
-                  {testStatus === 'completed' ? 'Completed' :
-                   testStatus === 'in_progress' ? 'In Progress' :
-                   testStatus === 'not_started' ? 'Not Started' : 'Pending'}
-                </Badge>
-                {questions.length > 0 && (
-                  <span className="text-sm text-gray-500">
-                    {questions.length} questions available
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                {testStatus === 'completed' && canRetry() && (
-                  <Button onClick={handleRetryTest} variant="outline" className="flex-1">
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Retry Test
-                  </Button>
-                )}
-                {(testStatus === 'not_started' || testStatus === 'in_progress') && questions.length > 0 && (
-                  <Button onClick={handleStartTest} className="flex-1 bg-cyan-500 hover:bg-cyan-600">
-                    <Play className="h-4 w-4 mr-2" />
-                    {testStatus === 'not_started' ? 'Start Test' : 'Continue Test'}
-                  </Button>
-                )}
-                {questions.length === 0 && (
-                  <div className="text-sm text-gray-500 p-4 bg-gray-100 rounded">
-                    No questions available yet. Please wait for your test to be generated.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Profile Card */}
           <Card>
             <CardHeader>
@@ -214,39 +165,69 @@ const CandidateDashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Results Card */}
-          <Card className="col-span-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-cyan-600">
-                <FileText className="h-5 w-5" />
-                Test History
-              </CardTitle>
-              <CardDescription>
-                Your previous test attempts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {testSessions.length > 0 ? (
-                <div className="space-y-2">
-                  {testSessions.map((session, index) => (
-                    <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                      <div>
-                        <span className="font-medium">Attempt {session.attempt || index + 1}</span>
-                        <p className="text-sm text-gray-500">
-                          {session.started_at ? new Date(session.started_at).toLocaleDateString() : 'Not started'}
-                        </p>
-                      </div>
-                      <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
-                        {session.status || 'In Progress'}
-                      </Badge>
-                    </div>
-                  ))}
+          {/* Sections Cards */}
+          {sections.map((section) => (
+            <Card key={section.id} className="col-span-full lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-cyan-600">
+                  <BookOpen className="h-5 w-5" />
+                  {section.name}
+                </CardTitle>
+                <CardDescription>
+                  {section.description || 'Assessment section'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Progress</span>
+                  <span className="text-sm text-gray-500">
+                    {section.answered_count} of {section.question_count} questions
+                  </span>
                 </div>
-              ) : (
-                <p className="text-gray-500">No test sessions yet</p>
-              )}
-            </CardContent>
-          </Card>
+                <Progress value={getProgressPercentage(section)} className="h-2" />
+                <div className="flex items-center gap-2">
+                  <Badge variant={
+                    section.status === 'completed' ? 'default' :
+                    section.status === 'in_progress' ? 'secondary' : 'outline'
+                  }>
+                    {section.status === 'completed' ? 'Completed' :
+                     section.status === 'in_progress' ? 'In Progress' : 'Not Started'}
+                  </Badge>
+                  <span className="text-sm text-gray-500">
+                    {section.time_limit_minutes} minutes • {section.question_count} questions
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  {section.question_count > 0 ? (
+                    <Button 
+                      onClick={() => handleStartSection(section.id)} 
+                      className="flex-1 bg-cyan-500 hover:bg-cyan-600"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      {section.status === 'not_started' ? 'Start Test' : 
+                       section.status === 'in_progress' ? 'Continue Test' : 'Review Test'}
+                    </Button>
+                  ) : (
+                    <div className="text-sm text-gray-500 p-4 bg-gray-100 rounded flex-1 text-center">
+                      Questions not available yet
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {sections.length === 0 && (
+            <Card className="col-span-full">
+              <CardContent className="p-8 text-center">
+                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Sections Available</h3>
+                <p className="text-gray-500">
+                  Test sections haven't been set up yet. Please contact your administrator.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
