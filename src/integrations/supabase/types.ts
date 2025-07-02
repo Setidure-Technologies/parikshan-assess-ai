@@ -138,6 +138,95 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_requests: {
+        Row: {
+          additional_notes: string | null
+          company_name: string
+          company_size: string | null
+          contact_person: string
+          created_at: string | null
+          email: string
+          id: string
+          industry: string | null
+          phone: string | null
+          preferred_plan: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          additional_notes?: string | null
+          company_name: string
+          company_size?: string | null
+          contact_person: string
+          created_at?: string | null
+          email: string
+          id?: string
+          industry?: string | null
+          phone?: string | null
+          preferred_plan?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          additional_notes?: string | null
+          company_name?: string
+          company_size?: string | null
+          contact_person?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          industry?: string | null
+          phone?: string | null
+          preferred_plan?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      evaluations: {
+        Row: {
+          candidate_id: string
+          created_at: string | null
+          evaluation_data: Json | null
+          evaluation_status: string | null
+          id: string
+          pdf_report_url: string | null
+          section_scores: Json | null
+          total_score: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string | null
+          evaluation_data?: Json | null
+          evaluation_status?: string | null
+          id?: string
+          pdf_report_url?: string | null
+          section_scores?: Json | null
+          total_score?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string | null
+          evaluation_data?: Json | null
+          evaluation_status?: string | null
+          id?: string
+          pdf_report_url?: string | null
+          section_scores?: Json | null
+          total_score?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluations_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_id: string | null
@@ -452,6 +541,7 @@ export type Database = {
         | "questions_generated"
         | "in_progress"
         | "completed"
+        | "submitted"
       user_role:
         | "admin"
         | "candidate"
@@ -589,6 +679,7 @@ export const Constants = {
         "questions_generated",
         "in_progress",
         "completed",
+        "submitted",
       ],
       user_role: [
         "admin",

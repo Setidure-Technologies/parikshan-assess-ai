@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { User, Play, RotateCcw, FileText, BookOpen } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { User, Play, RotateCcw, FileText, BookOpen, CheckCircle, Trophy, Building, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,28 +21,61 @@ interface Section {
   status: 'not_started' | 'in_progress' | 'completed';
 }
 
+interface CandidateInfo {
+  id: string;
+  test_status: string;
+  profile_data: any;
+  full_name: string;
+  email: string;
+  company?: {
+    name: string;
+    industry: string;
+  };
+}
+
 const CandidateDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [candidateId, setCandidateId] = useState<string | null>(null);
+  const [candidateInfo, setCandidateInfo] = useState<CandidateInfo | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
 
     const fetchCandidateData = async () => {
       try {
-        // Get candidate info
+        // Get candidate info with company details
         const { data: candidate, error: candidateError } = await supabase
           .from('candidates')
-          .select('*')
+          .select(`
+            *,
+            companies!inner(name, industry)
+          `)
           .eq('user_id', user.id)
           .single();
 
         if (candidateError) throw candidateError;
-        setCandidateId(candidate.id);
+        
+        setCandidateInfo({
+          id: candidate.id,
+          test_status: candidate.test_status,
+          profile_data: candidate.profile_data,
+          full_name: candidate.full_name,
+          email: candidate.email,
+          company: {
+            name: candidate.companies.name,
+            industry: candidate.companies.industry
+          }
+        });
+
+        // If already submitted, show completion message
+        if (candidate.test_status === 'submitted') {
+          setLoading(false);
+          return;
+        }
 
         // Get all sections
         const { data: allSections, error: sectionsError } = await supabase
@@ -129,6 +163,74 @@ const CandidateDashboard = () => {
     return Math.round((section.answered_count / section.question_count) * 100);
   };
 
+  const isAllSectionsCompleted = () => {
+    return sections.length > 0 && sections.every(section => section.status === 'completed');
+  };
+
+  const getTotalProgress = () => {
+    if (sections.length === 0) return 0;
+    const totalQuestions = sections.reduce((sum, section) => sum + section.question_count, 0);
+    const totalAnswered = sections.reduce((sum, section) => sum + section.answered_count, 0);
+    return totalQuestions > 0 ? Math.round((totalAnswered / totalQuestions) * 100) : 0;
+  };
+
+  const handleFinalSubmission = async () => {
+    if (!candidateInfo) return;
+    
+    setIsSubmitting(true);
+    try {
+      // Update candidate test status to submitted
+      const { error: updateError } = await supabase
+        .from('candidates')
+        .update({ test_status: 'submitted' })
+        .eq('id', candidateInfo.id);
+
+      if (updateError) throw updateError;
+
+      // Trigger webhook for test evaluation
+      try {
+        const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            candidate_id: candidateInfo.id,
+            user_id: user?.id,
+            email: candidateInfo.email,
+            full_name: candidateInfo.full_name,
+            company_name: candidateInfo.company?.name,
+            test_completed_at: new Date().toISOString()
+          })
+        });
+
+        if (!webhookResponse.ok) {
+          console.error('Webhook failed:', webhookResponse.statusText);
+        }
+      } catch (webhookError) {
+        console.error('Webhook error:', webhookError);
+        // Don't fail the submission if webhook fails
+      }
+
+      // Update local state
+      setCandidateInfo(prev => prev ? { ...prev, test_status: 'submitted' } : null);
+
+      toast({
+        title: "Test Submitted Successfully!",
+        description: "Your assessment has been submitted for evaluation. Results will be available soon.",
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit test. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
@@ -137,28 +239,138 @@ const CandidateDashboard = () => {
     );
   }
 
+  // Show completion message if test is already submitted
+  if (candidateInfo?.test_status === 'submitted') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-cyan-50 flex items-center justify-center p-4">
+        <Card className="max-w-2xl w-full shadow-2xl border-0">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-r from-green-500 to-cyan-500 rounded-full flex items-center justify-center mb-4">
+              <Trophy className="h-8 w-8 text-white" />
+            </div>
+            <CardTitle className="text-3xl font-bold text-gray-900">
+              Assessment Completed!
+            </CardTitle>
+            <CardDescription className="text-lg text-gray-600">
+              Thank you for completing your assessment
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center space-y-6">
+            <div className="bg-white p-6 rounded-lg border">
+              <h3 className="font-semibold text-lg mb-4">Candidate Information</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <User className="h-5 w-5 text-gray-500" />
+                  <span className="font-medium">{candidateInfo.full_name}</span>
+                </div>
+                {candidateInfo.company && (
+                  <>
+                    <div className="flex items-center justify-center gap-2">
+                      <Building className="h-5 w-5 text-gray-500" />
+                      <span>{candidateInfo.company.name}</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-2">
+                      <Briefcase className="h-5 w-5 text-gray-500" />
+                      <span>{candidateInfo.company.industry}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-gradient-to-r from-green-100 to-cyan-100 p-6 rounded-lg">
+              <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+              <h3 className="font-semibold text-lg mb-2">What's Next?</h3>
+              <p className="text-gray-700">
+                Your responses are being evaluated by our AI system. The hiring team will receive your detailed assessment report and contact you with next steps.
+              </p>
+            </div>
+
+            <div className="text-sm text-gray-500">
+              <p>Assessment submitted successfully</p>
+              <p>You may now close this window</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-stone-50 p-4">
       <div className="container mx-auto max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Candidate Dashboard</h1>
-          <p className="text-gray-600">Welcome back! Here's your test progress.</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Assessment Dashboard</h1>
+          <p className="text-gray-600">Welcome back! Complete your assessment sections below.</p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Overall Progress Card */}
+        <Card className="mb-8 shadow-lg border-0">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-cyan-600">
+              <Trophy className="h-5 w-5" />
+              Overall Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Total Progress</span>
+                <span className="text-sm text-gray-500">
+                  {sections.reduce((sum, s) => sum + s.answered_count, 0)} of{' '}
+                  {sections.reduce((sum, s) => sum + s.question_count, 0)} questions completed
+                </span>
+              </div>
+              <Progress value={getTotalProgress()} className="h-3" />
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  {sections.filter(s => s.status === 'completed').length} of {sections.length} sections completed
+                </div>
+                {isAllSectionsCompleted() && (
+                  <Badge className="bg-green-100 text-green-700">
+                    Ready for Final Submission
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Profile Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-cyan-600">
                 <User className="h-5 w-5" />
-                Profile
+                Your Profile
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="font-medium">{candidateInfo?.full_name}</p>
+                <p className="text-sm text-gray-600">{candidateInfo?.email}</p>
+              </div>
+              
+              {candidateInfo?.company && (
+                <div className="pt-3 border-t">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Building className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Company</span>
+                  </div>
+                  <p className="text-sm text-gray-700">{candidateInfo.company.name}</p>
+                  
+                  <div className="flex items-center gap-2 mt-2 mb-1">
+                    <Briefcase className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Industry</span>
+                  </div>
+                  <p className="text-sm text-gray-700">{candidateInfo.company.industry}</p>
+                </div>
+              )}
+              
               <Button 
                 onClick={() => navigate('/candidate-profile')} 
                 variant="outline" 
-                className="w-full"
+                className="w-full mt-4"
               >
                 Edit Profile
               </Button>
@@ -202,6 +414,7 @@ const CandidateDashboard = () => {
                     <Button 
                       onClick={() => handleStartSection(section.id)} 
                       className="flex-1 bg-cyan-500 hover:bg-cyan-600"
+                      disabled={candidateInfo?.test_status === 'submitted'}
                     >
                       <Play className="h-4 w-4 mr-2" />
                       {section.status === 'not_started' ? 'Start Test' : 
@@ -229,6 +442,70 @@ const CandidateDashboard = () => {
             </Card>
           )}
         </div>
+
+        {/* Final Submission Button */}
+        {isAllSectionsCompleted() && candidateInfo?.test_status !== 'submitted' && (
+          <Card className="shadow-xl border-2 border-green-200 bg-gradient-to-r from-green-50 to-cyan-50">
+            <CardContent className="p-8 text-center">
+              <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to Submit Your Assessment</h3>
+              <p className="text-gray-700 mb-6 max-w-2xl mx-auto">
+                You have successfully completed all sections of your assessment. Click below to submit your responses for final evaluation.
+              </p>
+              <p className="text-sm text-gray-600 mb-6">
+                <strong>Important:</strong> Once submitted, you cannot make any changes to your responses.
+              </p>
+              
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    size="lg" 
+                    className="bg-gradient-to-r from-green-500 to-cyan-500 hover:from-green-600 hover:to-cyan-600 text-white px-8 py-3"
+                  >
+                    Submit Complete Assessment
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Confirm Final Submission</DialogTitle>
+                    <DialogDescription className="space-y-3">
+                      <p>
+                        Are you sure you want to submit your complete assessment? This action cannot be undone.
+                      </p>
+                      <div className="bg-yellow-50 p-4 rounded-lg">
+                        <p className="font-medium text-yellow-800">Before submitting, please ensure:</p>
+                        <ul className="text-sm text-yellow-700 mt-2 space-y-1">
+                          <li>• You have reviewed all your responses</li>
+                          <li>• All sections are marked as complete</li>
+                          <li>• You are satisfied with your answers</li>
+                        </ul>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        After submission, your responses will be evaluated and the results will be sent to the hiring team.
+                      </p>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex gap-4 mt-6">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => {}}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      className="flex-1 bg-gradient-to-r from-green-500 to-cyan-500 hover:from-green-600 hover:to-cyan-600"
+                      onClick={handleFinalSubmission}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? "Submitting..." : "Confirm Submission"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
