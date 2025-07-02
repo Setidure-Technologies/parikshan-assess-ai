@@ -417,8 +417,8 @@ const Documentation = () => {
                 <ul className="space-y-1 text-gray-600 text-sm">
                   <li>• GET /api/candidates - List all candidates</li>
                   <li>• POST /api/candidates - Create new candidate</li>
-                  <li>• GET /api/evaluations/{id} - Get evaluation results</li>
-                  <li>• GET /api/reports/{id} - Download PDF report</li>
+                  <li>• GET /api/evaluations/[candidateId] - Get evaluation results</li>
+                  <li>• GET /api/reports/[candidateId] - Download PDF report</li>
                 </ul>
               </div>
             </CardContent>
