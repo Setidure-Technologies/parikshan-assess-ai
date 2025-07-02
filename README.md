@@ -4,6 +4,8 @@
 
 **URL**: https://lovable.dev/projects/2afad70e-cfa1-4c74-91dd-66866edfaa22
 
+tutorial link : - https://code2tutorial.com/tutorial/9556ea73-f015-4739-accc-5900318d64bf/index.md
+
 ## How can I edit this code?
 
 There are several ways of editing your application.
