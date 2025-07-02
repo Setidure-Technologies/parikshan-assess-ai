@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 
-interface DashboardHeaderProps {
+interface CandidateHeaderProps {
   onLogout: () => void;
 }
 
-const DashboardHeader = ({ onLogout }: DashboardHeaderProps) => {
+const CandidateHeader = ({ onLogout }: CandidateHeaderProps) => {
   return (
     <header className="bg-white shadow-sm border-b">
       <div className="container mx-auto px-4 py-4">
@@ -21,7 +21,7 @@ const DashboardHeader = ({ onLogout }: DashboardHeaderProps) => {
             <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
           </Link>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Welcome, Administrator</span>
+            <span className="text-sm text-gray-600">Welcome, Candidate</span>
             <Button variant="outline" size="sm" onClick={onLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -33,4 +33,4 @@ const DashboardHeader = ({ onLogout }: DashboardHeaderProps) => {
   );
 };
 
-export default DashboardHeader;
+export default CandidateHeader;

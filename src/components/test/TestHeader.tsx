@@ -23,10 +23,10 @@ export const TestHeader = ({ questionTimeRemaining, totalTimeRemaining, onSave }
           <Link to="/candidate-dashboard" className="flex items-center space-x-3">
             <img 
               src="/lovable-uploads/d1ba3c46-f6a5-4f1c-9b6e-e4d87e1c8a5b.png" 
-              alt="Peop360" 
+              alt="Parikshan AI" 
               className="h-10 w-auto"
             />
-            <span className="text-2xl font-bold text-gray-900">Peop360</span>
+            <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
           </Link>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2 text-sm text-gray-600">

@@ -5,30 +5,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Mail, Lock } from "lucide-react";
+import { useEffect } from "react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { signIn, user, userRole } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && userRole) {
+      if (userRole === 'admin') {
+        navigate('/admin-dashboard');
+      } else if (userRole === 'candidate') {
+        navigate('/candidate-dashboard');
+      }
+    }
+  }, [user, userRole, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await signIn(email, password);
 
       if (error) {
         toast({
-          title: "Error",
+          title: "Login Failed",
           description: error.message,
           variant: "destructive",
         });
@@ -40,11 +50,11 @@ const Login = () => {
         description: "You have been signed in successfully.",
       });
 
-      // Redirect will be handled by the auth state change
+      // The redirect will be handled by the useEffect above
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {
@@ -53,18 +63,18 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-blue-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-peop360-orange-light/20 flex flex-col">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-md">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">AI</span>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                TestGen Pro
-              </span>
+            <Link to="/" className="flex items-center space-x-3">
+              <img 
+                src="/lovable-uploads/d1ba3c46-f6a5-4f1c-9b6e-e4d87e1c8a5b.png" 
+                alt="Parikshan AI" 
+                className="h-10 w-auto"
+              />
+              <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
             </Link>
             <Link to="/">
               <Button variant="ghost" className="flex items-center gap-2">
@@ -83,7 +93,7 @@ const Login = () => {
             <CardHeader className="text-center">
               <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
               <CardDescription>
-                Sign in to your TestGen Pro account
+                Sign in to your Parikshan AI account
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -120,7 +130,7 @@ const Login = () => {
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700" 
+                  className="w-full bg-peop360-orange hover:bg-peop360-orange-dark text-white" 
                   disabled={isLoading}
                 >
                   {isLoading ? "Signing In..." : "Sign In"}
@@ -132,7 +142,7 @@ const Login = () => {
                   Don't have an account yet?
                 </p>
                 <Link to="/contact">
-                  <Button variant="outline" className="w-full border-cyan-200 text-cyan-600 hover:bg-cyan-50">
+                  <Button variant="outline" className="w-full border-peop360-orange text-peop360-orange hover:bg-peop360-orange hover:text-white">
                     Contact Sales for Access
                   </Button>
                 </Link>
@@ -141,8 +151,8 @@ const Login = () => {
               <div className="mt-4 text-center">
                 <p className="text-xs text-gray-500">
                   Need help? Contact{" "}
-                  <a href="mailto:support@testgenpro.com" className="text-cyan-600 hover:underline">
-                    support@testgenpro.com
+                  <a href="mailto:support@parikshan.ai" className="text-peop360-orange hover:underline">
+                    support@parikshan.ai
                   </a>
                 </p>
               </div>
