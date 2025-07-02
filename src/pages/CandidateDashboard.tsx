@@ -234,7 +234,7 @@ const CandidateDashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-peop360-orange"></div>
       </div>
     );
   }
@@ -242,10 +242,10 @@ const CandidateDashboard = () => {
   // Show completion message if test is already submitted
   if (candidateInfo?.test_status === 'submitted') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-cyan-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center p-4">
         <Card className="max-w-2xl w-full shadow-2xl border-0">
           <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-r from-green-500 to-cyan-500 rounded-full flex items-center justify-center mb-4">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-r from-peop360-orange to-orange-400 rounded-full flex items-center justify-center mb-4">
               <Trophy className="h-8 w-8 text-white" />
             </div>
             <CardTitle className="text-3xl font-bold text-gray-900">
@@ -278,8 +278,8 @@ const CandidateDashboard = () => {
               </div>
             </div>
             
-            <div className="bg-gradient-to-r from-green-100 to-cyan-100 p-6 rounded-lg">
-              <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+            <div className="bg-gradient-to-r from-orange-100 to-orange-200 p-6 rounded-lg">
+              <CheckCircle className="h-12 w-12 text-peop360-orange mx-auto mb-4" />
               <h3 className="font-semibold text-lg mb-2">What's Next?</h3>
               <p className="text-gray-700">
                 Your responses are being evaluated by our AI system. The hiring team will receive your detailed assessment report and contact you with next steps.
@@ -307,7 +307,7 @@ const CandidateDashboard = () => {
         {/* Overall Progress Card */}
         <Card className="mb-8 shadow-lg border-0">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-cyan-600">
+            <CardTitle className="flex items-center gap-2 text-peop360-orange">
               <Trophy className="h-5 w-5" />
               Overall Progress
             </CardTitle>
@@ -340,7 +340,7 @@ const CandidateDashboard = () => {
           {/* Profile Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-cyan-600">
+              <CardTitle className="flex items-center gap-2 text-peop360-orange">
                 <User className="h-5 w-5" />
                 Your Profile
               </CardTitle>
@@ -381,7 +381,7 @@ const CandidateDashboard = () => {
           {sections.map((section) => (
             <Card key={section.id} className="col-span-full lg:col-span-2">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-cyan-600">
+                <CardTitle className="flex items-center gap-2 text-peop360-orange">
                   <BookOpen className="h-5 w-5" />
                   {section.name}
                 </CardTitle>
@@ -413,7 +413,7 @@ const CandidateDashboard = () => {
                   {section.question_count > 0 ? (
                     <Button 
                       onClick={() => handleStartSection(section.id)} 
-                      className="flex-1 bg-cyan-500 hover:bg-cyan-600"
+                      className="flex-1 bg-peop360-orange hover:bg-peop360-orange-dark text-white"
                       disabled={candidateInfo?.test_status === 'submitted'}
                     >
                       <Play className="h-4 w-4 mr-2" />
@@ -445,9 +445,9 @@ const CandidateDashboard = () => {
 
         {/* Final Submission Button */}
         {isAllSectionsCompleted() && candidateInfo?.test_status !== 'submitted' && (
-          <Card className="shadow-xl border-2 border-green-200 bg-gradient-to-r from-green-50 to-cyan-50">
+          <Card className="shadow-xl border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-orange-100">
             <CardContent className="p-8 text-center">
-              <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
+              <CheckCircle className="h-16 w-16 text-peop360-orange mx-auto mb-4" />
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to Submit Your Assessment</h3>
               <p className="text-gray-700 mb-6 max-w-2xl mx-auto">
                 You have successfully completed all sections of your assessment. Click below to submit your responses for final evaluation.
@@ -460,7 +460,7 @@ const CandidateDashboard = () => {
                 <DialogTrigger asChild>
                   <Button 
                     size="lg" 
-                    className="bg-gradient-to-r from-green-500 to-cyan-500 hover:from-green-600 hover:to-cyan-600 text-white px-8 py-3"
+                    className="bg-gradient-to-r from-peop360-orange to-orange-400 hover:from-peop360-orange-dark hover:to-orange-500 text-white px-8 py-3"
                   >
                     Submit Complete Assessment
                   </Button>
@@ -494,7 +494,7 @@ const CandidateDashboard = () => {
                       Cancel
                     </Button>
                     <Button 
-                      className="flex-1 bg-gradient-to-r from-green-500 to-cyan-500 hover:from-green-600 hover:to-cyan-600"
+                      className="flex-1 bg-gradient-to-r from-peop360-orange to-orange-400 hover:from-peop360-orange-dark hover:to-orange-500 text-white"
                       onClick={handleFinalSubmission}
                       disabled={isSubmitting}
                     >

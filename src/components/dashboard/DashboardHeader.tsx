@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Brain, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface DashboardHeaderProps {
@@ -12,9 +12,13 @@ const DashboardHeader = ({ onLogout }: DashboardHeaderProps) => {
     <header className="bg-white shadow-sm border-b">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center space-x-2">
-            <Brain className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
+          <Link to="/" className="flex items-center space-x-3">
+            <img 
+              src="/lovable-uploads/d1ba3c46-f6a5-4f1c-9b6e-e4d87e1c8a5b.png" 
+              alt="Peop360" 
+              className="h-10 w-auto"
+            />
+            <span className="text-2xl font-bold text-gray-900">Peop360</span>
           </Link>
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-600">Welcome, Administrator</span>
