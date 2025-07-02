@@ -299,7 +299,7 @@ const CandidateDashboard = () => {
                 Assessment Completed!
               </CardTitle>
               <CardDescription className="text-lg text-gray-600">
-                Thank you for completing your assessment
+                Thank you for completing your assessment with Parikshan AI
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6">
@@ -350,7 +350,7 @@ const CandidateDashboard = () => {
       <div className="p-4 pt-20">
         <div className="container mx-auto max-w-4xl">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Assessment Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Parikshan AI Assessment Dashboard</h1>
             <p className="text-gray-600">Welcome back! Complete your assessment sections below.</p>
           </div>
 
@@ -500,7 +500,7 @@ const CandidateDashboard = () => {
                 <CheckCircle className="h-16 w-16 text-primary mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to Submit Your Assessment</h3>
                 <p className="text-gray-700 mb-6 max-w-2xl mx-auto">
-                  You have successfully completed all sections of your assessment. Click below to submit your responses for final evaluation.
+                  You have successfully completed all sections of your Parikshan AI assessment. Click below to submit your responses for final evaluation.
                 </p>
                 <p className="text-sm text-gray-600 mb-6">
                   <strong>Important:</strong> Once submitted, you cannot make any changes to your responses.
