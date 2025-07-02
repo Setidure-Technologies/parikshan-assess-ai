@@ -46,10 +46,10 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* Peop360 Brand Colors */
-    --peop360-orange: 24 100% 50%;
-    --peop360-orange-light: 24 100% 55%;
-    --peop360-orange-dark: 24 100% 45%;
+    /* Professional Parikshan AI Brand Colors */
+    --parikshan-orange: 20 85% 45%;
+    --parikshan-orange-light: 20 85% 50%;
+    --parikshan-orange-dark: 20 85% 40%;
   }
 
   .dark {
@@ -101,21 +101,21 @@
   }
 }
 
-/* Peop360 Brand Utilities */
+/* Parikshan AI Brand Utilities */
 @layer utilities {
-  .text-peop360-orange {
-    color: hsl(var(--peop360-orange));
+  .text-parikshan-orange {
+    color: hsl(var(--parikshan-orange));
   }
-  .bg-peop360-orange {
-    background-color: hsl(var(--peop360-orange));
+  .bg-parikshan-orange {
+    background-color: hsl(var(--parikshan-orange));
   }
-  .border-peop360-orange {
-    border-color: hsl(var(--peop360-orange));
+  .border-parikshan-orange {
+    border-color: hsl(var(--parikshan-orange));
   }
-  .hover\:bg-peop360-orange-light:hover {
-    background-color: hsl(var(--peop360-orange-light));
+  .hover\:bg-parikshan-orange-light:hover {
+    background-color: hsl(var(--parikshan-orange-light));
   }
-  .hover\:bg-peop360-orange-dark:hover {
-    background-color: hsl(var(--peop360-orange-dark));
+  .hover\:bg-parikshan-orange-dark:hover {
+    background-color: hsl(var(--parikshan-orange-dark));
   }
 }
