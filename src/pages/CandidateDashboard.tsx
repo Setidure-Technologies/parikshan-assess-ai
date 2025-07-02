@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -194,54 +195,60 @@ const CandidateDashboard = () => {
 
       if (updateError) throw updateError;
 
-      // Prepare comprehensive webhook payload
+      // Prepare comprehensive webhook payload using FormData (like CSV upload)
       const totalQuestions = sections.reduce((sum, section) => sum + section.question_count, 0);
       const totalAnswers = sections.reduce((sum, section) => sum + section.answered_count, 0);
       const completedSections = sections.filter(s => s.status === 'completed').length;
 
-      const webhookPayload = {
-        candidate_id: candidateInfo.id,
-        user_id: user?.id,
-        personal_info: {
-          full_name: candidateInfo.full_name,
-          email: candidateInfo.email,
-          phone: candidateInfo.phone || null
-        },
-        company_info: {
-          company_name: candidateInfo.company?.name || null,
-          company_industry: candidateInfo.company?.industry || null
-        },
-        assessment_summary: {
-          total_sections: sections.length,
-          completed_sections: completedSections,
-          total_questions: totalQuestions,
-          total_answers: totalAnswers,
-          completion_rate: totalQuestions > 0 ? Math.round((totalAnswers / totalQuestions) * 100) : 0
-        },
-        section_details: sections.map(section => ({
-          section_id: section.id,
-          section_name: section.name,
-          questions_count: section.question_count,
-          answers_count: section.answered_count,
-          completion_status: section.status
-        })),
-        profile_data: candidateInfo.profile_data,
-        test_completed_at: new Date().toISOString()
-      };
+      const formData = new FormData();
+      
+      // Basic candidate info
+      formData.append('candidate_id', candidateInfo.id);
+      formData.append('user_id', user?.id || '');
+      formData.append('full_name', candidateInfo.full_name);
+      formData.append('email', candidateInfo.email);
+      formData.append('phone', candidateInfo.phone || '');
+      
+      // Company info
+      formData.append('company_name', candidateInfo.company?.name || '');
+      formData.append('company_industry', candidateInfo.company?.industry || '');
+      
+      // Assessment summary
+      formData.append('total_sections', sections.length.toString());
+      formData.append('completed_sections', completedSections.toString());
+      formData.append('total_questions', totalQuestions.toString());
+      formData.append('total_answers', totalAnswers.toString());
+      formData.append('completion_rate', totalQuestions > 0 ? Math.round((totalAnswers / totalQuestions) * 100).toString() : '0');
+      
+      // Section details as JSON string
+      const sectionDetails = sections.map(section => ({
+        section_id: section.id,
+        section_name: section.name,
+        questions_count: section.question_count,
+        answers_count: section.answered_count,
+        completion_status: section.status
+      }));
+      formData.append('section_details', JSON.stringify(sectionDetails));
+      
+      // Profile data as JSON string
+      formData.append('profile_data', JSON.stringify(candidateInfo.profile_data || {}));
+      
+      // Timestamp and action
+      formData.append('test_completed_at', new Date().toISOString());
+      formData.append('action', 'test_evaluation');
 
-      // Trigger webhook for test evaluation
+      // Trigger webhook for test evaluation using FormData
       try {
-        console.log('Sending comprehensive webhook payload:', webhookPayload);
+        console.log('Sending FormData webhook payload for test evaluation');
         const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(webhookPayload)
+          body: formData
         });
 
         if (!webhookResponse.ok) {
-          console.error('Webhook failed:', webhookResponse.statusText);
+          console.error('Webhook failed:', webhookResponse.status, webhookResponse.statusText);
+          const errorText = await webhookResponse.text();
+          console.error('Webhook error response:', errorText);
         } else {
           console.log('Webhook sent successfully');
         }
@@ -272,7 +279,7 @@ const CandidateDashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-parikshan-orange"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -280,12 +287,12 @@ const CandidateDashboard = () => {
   // Show completion message if test is already submitted
   if (candidateInfo?.test_status === 'submitted') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
         <CandidateHeader onLogout={handleLogout} />
         <div className="flex items-center justify-center p-4 pt-20">
           <Card className="max-w-2xl w-full shadow-2xl border-0">
             <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-r from-parikshan-orange to-orange-400 rounded-full flex items-center justify-center mb-4">
+              <div className="mx-auto w-16 h-16 bg-gradient-to-r from-primary to-blue-400 rounded-full flex items-center justify-center mb-4">
                 <Trophy className="h-8 w-8 text-white" />
               </div>
               <CardTitle className="text-3xl font-bold text-gray-900">
@@ -318,8 +325,8 @@ const CandidateDashboard = () => {
                 </div>
               </div>
               
-              <div className="bg-gradient-to-r from-orange-100 to-orange-200 p-6 rounded-lg">
-                <CheckCircle className="h-12 w-12 text-parikshan-orange mx-auto mb-4" />
+              <div className="bg-gradient-to-r from-blue-100 to-blue-200 p-6 rounded-lg">
+                <CheckCircle className="h-12 w-12 text-primary mx-auto mb-4" />
                 <h3 className="font-semibold text-lg mb-2">What's Next?</h3>
                 <p className="text-gray-700">
                   Your responses are being evaluated by our AI system. The hiring team will receive your detailed assessment report and contact you with next steps.
@@ -350,7 +357,7 @@ const CandidateDashboard = () => {
           {/* Overall Progress Card */}
           <Card className="mb-8 shadow-lg border-0">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-parikshan-orange">
+              <CardTitle className="flex items-center gap-2 text-primary">
                 <Trophy className="h-5 w-5" />
                 Overall Progress
               </CardTitle>
@@ -383,7 +390,7 @@ const CandidateDashboard = () => {
             {/* Profile Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-parikshan-orange">
+                <CardTitle className="flex items-center gap-2 text-primary">
                   <User className="h-5 w-5" />
                   Your Profile
                 </CardTitle>
@@ -424,7 +431,7 @@ const CandidateDashboard = () => {
             {sections.map((section) => (
               <Card key={section.id} className="col-span-full lg:col-span-2">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-parikshan-orange">
+                  <CardTitle className="flex items-center gap-2 text-primary">
                     <BookOpen className="h-5 w-5" />
                     {section.name}
                   </CardTitle>
@@ -456,7 +463,7 @@ const CandidateDashboard = () => {
                     {section.question_count > 0 ? (
                       <Button 
                         onClick={() => handleStartSection(section.id)} 
-                        className="flex-1 bg-parikshan-orange hover:bg-parikshan-orange-dark text-white"
+                        className="flex-1 bg-primary hover:bg-primary/90 text-white"
                         disabled={candidateInfo?.test_status === 'submitted'}
                       >
                         <Play className="h-4 w-4 mr-2" />
@@ -488,9 +495,9 @@ const CandidateDashboard = () => {
 
           {/* Final Submission Button */}
           {isAllSectionsCompleted() && candidateInfo?.test_status !== 'submitted' && (
-            <Card className="shadow-xl border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-orange-100">
+            <Card className="shadow-xl border-2 border-primary/20 bg-gradient-to-r from-blue-50 to-blue-100">
               <CardContent className="p-8 text-center">
-                <CheckCircle className="h-16 w-16 text-parikshan-orange mx-auto mb-4" />
+                <CheckCircle className="h-16 w-16 text-primary mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Ready to Submit Your Assessment</h3>
                 <p className="text-gray-700 mb-6 max-w-2xl mx-auto">
                   You have successfully completed all sections of your assessment. Click below to submit your responses for final evaluation.
@@ -503,7 +510,7 @@ const CandidateDashboard = () => {
                   <DialogTrigger asChild>
                     <Button 
                       size="lg" 
-                      className="bg-gradient-to-r from-parikshan-orange to-orange-400 hover:from-parikshan-orange-dark hover:to-orange-500 text-white px-8 py-3"
+                      className="bg-gradient-to-r from-primary to-blue-400 hover:from-primary/90 hover:to-blue-500 text-white px-8 py-3"
                     >
                       Submit Complete Assessment
                     </Button>
@@ -537,7 +544,7 @@ const CandidateDashboard = () => {
                         Cancel
                       </Button>
                       <Button 
-                        className="flex-1 bg-gradient-to-r from-parikshan-orange to-orange-400 hover:from-parikshan-orange-dark hover:to-orange-500 text-white"
+                        className="flex-1 bg-gradient-to-r from-primary to-blue-400 hover:from-primary/90 hover:to-blue-500 text-white"
                         onClick={handleFinalSubmission}
                         disabled={isSubmitting}
                       >

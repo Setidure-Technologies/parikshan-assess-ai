@@ -87,25 +87,25 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-peop360-orange-light/20">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100/20">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <img 
-                src="/lovable-uploads/d1ba3c46-f6a5-4f1c-9b6e-e4d87e1c8a5b.png" 
+                src="https://raw.githubusercontent.com/Setidure-Technologies/parikshan-assess-ai/main/Peop360_Primary%20Logo.png" 
                 alt="Parikshan AI" 
                 className="h-10 w-auto"
               />
               <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#pricing" className="text-gray-600 hover:text-peop360-orange transition-colors">Pricing</a>
-              <Link to="/documentation" className="text-gray-600 hover:text-peop360-orange transition-colors">Documentation</Link>
-              <Link to="/contact" className="text-gray-600 hover:text-peop360-orange transition-colors">Contact</Link>
+              <a href="#pricing" className="text-gray-600 hover:text-primary transition-colors">Pricing</a>
+              <Link to="/documentation" className="text-gray-600 hover:text-primary transition-colors">Documentation</Link>
+              <Link to="/contact" className="text-gray-600 hover:text-primary transition-colors">Contact</Link>
               <Link to="/login">
-                <Button variant="outline" className="border-peop360-orange text-peop360-orange hover:bg-peop360-orange hover:text-white">
+                <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">
                   Sign In
                 </Button>
               </Link>
@@ -117,10 +117,10 @@ const Index = () => {
       {/* Hero Section */}
       <section className="py-20">
         <div className="container mx-auto px-4 text-center">
-          <Badge className="mb-4 bg-peop360-orange-light/20 text-peop360-orange hover:bg-peop360-orange-light/30">
+          <Badge className="mb-4 bg-primary/20 text-primary hover:bg-primary/30">
             AI-Powered Assessment Platform
           </Badge>
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-peop360-orange to-peop360-orange-dark bg-clip-text text-transparent">
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
             Transform Your Hiring Process with AI
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
@@ -128,11 +128,11 @@ const Index = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/contact">
-              <Button size="lg" className="bg-peop360-orange hover:bg-peop360-orange-dark text-white px-8 py-3">
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 py-3">
                 Start Free Trial
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="border-peop360-orange text-peop360-orange hover:bg-peop360-orange hover:text-white px-8 py-3">
+            <Button size="lg" variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white px-8 py-3">
               View Demo
             </Button>
           </div>
@@ -154,7 +154,7 @@ const Index = () => {
             {features.map((feature, index) => (
               <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
                 <CardHeader>
-                  <div className="h-12 w-12 bg-peop360-orange rounded-lg flex items-center justify-center text-white mb-4">
+                  <div className="h-12 w-12 bg-primary rounded-lg flex items-center justify-center text-white mb-4">
                     {feature.icon}
                   </div>
                   <CardTitle className="text-lg">{feature.title}</CardTitle>
@@ -181,16 +181,16 @@ const Index = () => {
           </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {plans.map((plan) => (
-              <Card key={plan.id} className={`relative ${plan.popular ? 'border-2 border-peop360-orange shadow-xl' : 'border shadow-lg'}`}>
+              <Card key={plan.id} className={`relative ${plan.popular ? 'border-2 border-primary shadow-xl' : 'border shadow-lg'}`}>
                 {plan.popular && (
-                  <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-peop360-orange text-white">
+                  <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-white">
                     Most Popular
                   </Badge>
                 )}
                 <CardHeader className="text-center">
                   <CardTitle className="text-2xl">{plan.name}</CardTitle>
                   <div className="flex items-center justify-center gap-2 mt-4">
-                    <span className="text-4xl font-bold text-peop360-orange">{plan.price}</span>
+                    <span className="text-4xl font-bold text-primary">{plan.price}</span>
                     <span className="text-gray-600">{plan.unit}</span>
                   </div>
                   <CardDescription className="text-lg">
@@ -209,7 +209,7 @@ const Index = () => {
                   <Link to="/contact" className="w-full">
                     <Button 
                       className={`w-full ${plan.popular 
-                        ? 'bg-peop360-orange hover:bg-peop360-orange-dark' 
+                        ? 'bg-primary hover:bg-primary/90' 
                         : 'bg-gray-900 hover:bg-gray-800'
                       }`}
                     >
@@ -244,7 +244,7 @@ const Index = () => {
                   <div>
                     <p className="font-semibold text-gray-900">{testimonial.name}</p>
                     <p className="text-gray-600">{testimonial.role}</p>
-                    <p className="text-peop360-orange font-medium">{testimonial.company}</p>
+                    <p className="text-primary font-medium">{testimonial.company}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -254,16 +254,16 @@ const Index = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-peop360-orange">
+      <section className="py-16 bg-primary">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
             Ready to Transform Your Hiring?
           </h2>
-          <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
             Join hundreds of companies using AI to make better hiring decisions faster.
           </p>
           <Link to="/contact">
-            <Button size="lg" className="bg-white text-peop360-orange hover:bg-gray-100 px-8 py-3">
+            <Button size="lg" className="bg-white text-primary hover:bg-gray-100 px-8 py-3">
               Get Started Today
             </Button>
           </Link>
@@ -277,7 +277,7 @@ const Index = () => {
             <div>
               <div className="flex items-center space-x-3 mb-4">
                 <img 
-                  src="/lovable-uploads/d1ba3c46-f6a5-4f1c-9b6e-e4d87e1c8a5b.png" 
+                  src="https://raw.githubusercontent.com/Setidure-Technologies/parikshan-assess-ai/main/Peop360_Primary%20Logo.png" 
                   alt="Parikshan AI" 
                   className="h-8 w-auto"
                 />

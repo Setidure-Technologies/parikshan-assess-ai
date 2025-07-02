@@ -63,14 +63,14 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-peop360-orange-light/20 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100/20 flex flex-col">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-md">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
             <Link to="/" className="flex items-center space-x-3">
               <img 
-                src="/lovable-uploads/d1ba3c46-f6a5-4f1c-9b6e-e4d87e1c8a5b.png" 
+                src="https://raw.githubusercontent.com/Setidure-Technologies/parikshan-assess-ai/main/Peop360_Primary%20Logo.png" 
                 alt="Parikshan AI" 
                 className="h-10 w-auto"
               />
@@ -130,7 +130,7 @@ const Login = () => {
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full bg-peop360-orange hover:bg-peop360-orange-dark text-white" 
+                  className="w-full bg-primary hover:bg-primary/90 text-white" 
                   disabled={isLoading}
                 >
                   {isLoading ? "Signing In..." : "Sign In"}
@@ -142,7 +142,7 @@ const Login = () => {
                   Don't have an account yet?
                 </p>
                 <Link to="/contact">
-                  <Button variant="outline" className="w-full border-peop360-orange text-peop360-orange hover:bg-peop360-orange hover:text-white">
+                  <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
                     Contact Sales for Access
                   </Button>
                 </Link>
@@ -151,7 +151,7 @@ const Login = () => {
               <div className="mt-4 text-center">
                 <p className="text-xs text-gray-500">
                   Need help? Contact{" "}
-                  <a href="mailto:support@parikshan.ai" className="text-peop360-orange hover:underline">
+                  <a href="mailto:support@parikshan.ai" className="text-primary hover:underline">
                     support@parikshan.ai
                   </a>
                 </p>

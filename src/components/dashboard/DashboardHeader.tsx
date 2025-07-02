@@ -14,7 +14,7 @@ const DashboardHeader = ({ onLogout }: DashboardHeaderProps) => {
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-3">
             <img 
-              src="/lovable-uploads/d1ba3c46-f6a5-4f1c-9b6e-e4d87e1c8a5b.png" 
+              src="https://raw.githubusercontent.com/Setidure-Technologies/parikshan-assess-ai/main/Peop360_Primary%20Logo.png" 
               alt="Parikshan AI" 
               className="h-10 w-auto"
             />
