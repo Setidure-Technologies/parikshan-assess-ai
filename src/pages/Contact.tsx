@@ -74,13 +74,13 @@ const Contact = () => {
       <header className="border-b bg-white/80 backdrop-blur-md">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">AI</span>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                TestGen Pro
-              </span>
+            <Link to="/" className="flex items-center space-x-3">
+              <img 
+                src="https://raw.githubusercontent.com/Setidure-Technologies/parikshan-assess-ai/main/Peop360_Primary%20Logo.png" 
+                alt="Parikshan AI" 
+                className="h-10 w-auto"
+              />
+              <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
             </Link>
             <Link to="/">
               <Button variant="ghost" className="flex items-center gap-2">
@@ -96,7 +96,7 @@ const Contact = () => {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-              Get Started with TestGen Pro
+              Get Started with Parikshan AI
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Ready to transform your hiring process? Contact our sales team to discuss your requirements and get a personalized quote.
@@ -235,7 +235,7 @@ const Contact = () => {
                     <Mail className="h-5 w-5 text-cyan-600" />
                     <div>
                       <p className="font-medium">Email</p>
-                      <p className="text-gray-600">sales@testgenpro.com</p>
+                      <p className="text-gray-600">sales@parikshan.ai</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -257,7 +257,7 @@ const Contact = () => {
 
               <Card className="shadow-lg border-0 bg-gradient-to-br from-cyan-50 to-blue-50">
                 <CardContent className="p-6">
-                  <h3 className="font-semibold mb-3 text-cyan-900">Why Choose TestGen Pro?</h3>
+                  <h3 className="font-semibold mb-3 text-cyan-900">Why Choose Parikshan AI?</h3>
                   <ul className="space-y-2 text-sm text-cyan-800">
                     <li>• 90% faster test creation with AI</li>
                     <li>• 60% reduction in time-to-hire</li>

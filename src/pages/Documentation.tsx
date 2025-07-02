@@ -28,7 +28,7 @@ const Documentation = () => {
       content: (
         <div className="space-y-6">
           <p className="text-lg text-gray-700">
-            TestGen Pro is an AI-powered assessment platform designed to streamline your hiring process through intelligent question generation, automated candidate management, and comprehensive analytics.
+            Parikshan AI is an AI-powered assessment platform designed to streamline your hiring process through intelligent question generation, automated candidate management, and comprehensive analytics.
           </p>
           
           <div className="grid md:grid-cols-2 gap-6">
@@ -490,13 +490,13 @@ const Documentation = () => {
       <header className="border-b bg-white sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center justify-between">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="h-8 w-8 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">AI</span>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                TestGen Pro
-              </span>
+            <Link to="/" className="flex items-center space-x-3">
+              <img 
+                src="https://raw.githubusercontent.com/Setidure-Technologies/parikshan-assess-ai/main/Peop360_Primary%20Logo.png" 
+                alt="Parikshan AI" 
+                className="h-10 w-auto"
+              />
+              <span className="text-2xl font-bold text-gray-900">Parikshan AI</span>
             </Link>
             <Link to="/">
               <Button variant="ghost" className="flex items-center gap-2">
@@ -515,7 +515,7 @@ const Documentation = () => {
               Documentation
             </h1>
             <p className="text-lg text-gray-600 mb-6">
-              Complete guide to using TestGen Pro for your hiring needs
+              Complete guide to using Parikshan AI for your hiring needs
             </p>
             
             {/* Search */}
