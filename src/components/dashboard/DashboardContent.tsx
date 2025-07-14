@@ -8,6 +8,7 @@ import { useCandidates } from "@/hooks/useCandidates";
 import CompanyDetailsCard from "./CompanyDetailsCard";
 import StatsCards from "./StatsCards";
 import CandidatesList from "./CandidatesList";
+import { EnhancedCsvUploadForm } from "@/components/EnhancedCsvUploadForm";
 import CsvUploadForm from "@/components/CsvUploadForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, Zap, Users, CheckCircle } from "lucide-react";
@@ -101,7 +102,7 @@ const DashboardContent = () => {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <CsvUploadForm />
+        <EnhancedCsvUploadForm />
         <CandidatesList
           candidatesData={candidates}
           selectedCandidates={selectedCandidates}
