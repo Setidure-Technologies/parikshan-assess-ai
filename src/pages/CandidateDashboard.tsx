@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, Play, RotateCcw, FileText, BookOpen, CheckCircle, Trophy, Building, Briefcase } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { User, Play, RotateCcw, FileText, BookOpen, CheckCircle, Trophy, Building, Briefcase, Lock, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useSubmissionState } from '@/hooks/useSubmissionState';
 import CandidateHeader from '@/components/CandidateHeader';
 
 interface Section {
@@ -42,7 +44,15 @@ const CandidateDashboard = () => {
   const [candidateInfo, setCandidateInfo] = useState<CandidateInfo | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSubmissionDialog, setShowSubmissionDialog] = useState(false);
+  
+  // Use new submission state management
+  const { 
+    submissionState, 
+    isLoading: submissionLoading, 
+    isSubmitting, 
+    submitAssessment 
+  } = useSubmissionState(candidateInfo?.id || null);
 
   const handleLogout = async () => {
     await signOut();
@@ -183,96 +193,35 @@ const CandidateDashboard = () => {
   };
 
   const handleFinalSubmission = async () => {
-    if (!candidateInfo) return;
+    if (!candidateInfo || !submissionState.canSubmit) return;
     
-    setIsSubmitting(true);
-    try {
-      // Update candidate test status to submitted
-      const { error: updateError } = await supabase
-        .from('candidates')
-        .update({ test_status: 'submitted' })
-        .eq('id', candidateInfo.id);
+    // Prepare submission data
+    const totalQuestions = sections.reduce((sum, section) => sum + section.question_count, 0);
+    const totalAnswers = sections.reduce((sum, section) => sum + section.answered_count, 0);
+    const completedSections = sections.filter(s => s.status === 'completed').length;
 
-      if (updateError) throw updateError;
-
-      // Prepare comprehensive webhook payload using FormData (like CSV upload)
-      const totalQuestions = sections.reduce((sum, section) => sum + section.question_count, 0);
-      const totalAnswers = sections.reduce((sum, section) => sum + section.answered_count, 0);
-      const completedSections = sections.filter(s => s.status === 'completed').length;
-
-      const formData = new FormData();
-      
-      // Basic candidate info
-      formData.append('candidate_id', candidateInfo.id);
-      formData.append('user_id', user?.id || '');
-      formData.append('full_name', candidateInfo.full_name);
-      formData.append('email', candidateInfo.email);
-      formData.append('phone', candidateInfo.phone || '');
-      
-      // Company info
-      formData.append('company_name', candidateInfo.company?.name || '');
-      formData.append('company_industry', candidateInfo.company?.industry || '');
-      
-      // Assessment summary
-      formData.append('total_sections', sections.length.toString());
-      formData.append('completed_sections', completedSections.toString());
-      formData.append('total_questions', totalQuestions.toString());
-      formData.append('total_answers', totalAnswers.toString());
-      formData.append('completion_rate', totalQuestions > 0 ? Math.round((totalAnswers / totalQuestions) * 100).toString() : '0');
-      
-      // Section details as JSON string
-      const sectionDetails = sections.map(section => ({
+    const submissionData = {
+      total_sections: sections.length,
+      completed_sections: completedSections,
+      total_questions: totalQuestions,
+      total_answers: totalAnswers,
+      completion_rate: totalQuestions > 0 ? Math.round((totalAnswers / totalQuestions) * 100) : 0,
+      section_details: sections.map(section => ({
         section_id: section.id,
         section_name: section.name,
         questions_count: section.question_count,
         answers_count: section.answered_count,
         completion_status: section.status
-      }));
-      formData.append('section_details', JSON.stringify(sectionDetails));
-      
-      // Profile data as JSON string
-      formData.append('profile_data', JSON.stringify(candidateInfo.profile_data || {}));
-      
-      // Timestamp and action
-      formData.append('test_completed_at', new Date().toISOString());
-      formData.append('action', 'test_evaluation');
+      })),
+      profile_data: candidateInfo.profile_data || {}
+    };
 
-      // Trigger webhook for test evaluation using FormData
-      try {
-        console.log('Sending FormData webhook payload for test evaluation');
-        const webhookResponse = await fetch('https://n8n.erudites.in/webhook-test/testevaluation', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!webhookResponse.ok) {
-          console.error('Webhook failed:', webhookResponse.status, webhookResponse.statusText);
-          const errorText = await webhookResponse.text();
-          console.error('Webhook error response:', errorText);
-        } else {
-          console.log('Webhook sent successfully');
-        }
-      } catch (webhookError) {
-        console.error('Webhook error:', webhookError);
-        // Don't fail the submission if webhook fails
-      }
-
+    const result = await submitAssessment(submissionData);
+    
+    if (result.success) {
       // Update local state
       setCandidateInfo(prev => prev ? { ...prev, test_status: 'submitted' } : null);
-
-      toast({
-        title: "Test Submitted Successfully!",
-        description: "Your assessment has been submitted for evaluation. Results will be available soon.",
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit test. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+      setShowSubmissionDialog(false);
     }
   };
 
@@ -284,22 +233,33 @@ const CandidateDashboard = () => {
     );
   }
 
-  // Show completion message if test is already submitted
-  if (candidateInfo?.test_status === 'submitted') {
+  // Show completion/locked message if test is submitted
+  if (candidateInfo?.test_status === 'submitted' || submissionState.isLocked) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
         <CandidateHeader onLogout={handleLogout} />
         <div className="flex items-center justify-center p-4 pt-20">
           <Card className="max-w-2xl w-full shadow-2xl border-0">
             <CardHeader className="text-center">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-r from-primary to-blue-400 rounded-full flex items-center justify-center mb-4">
-                <Trophy className="h-8 w-8 text-white" />
+              <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                submissionState.isLocked 
+                  ? 'bg-gradient-to-r from-red-500 to-red-600' 
+                  : 'bg-gradient-to-r from-primary to-blue-400'
+              }`}>
+                {submissionState.isLocked ? (
+                  <Lock className="h-8 w-8 text-white" />
+                ) : (
+                  <Trophy className="h-8 w-8 text-white" />
+                )}
               </div>
               <CardTitle className="text-3xl font-bold text-gray-900">
-                Assessment Completed!
+                {submissionState.isLocked ? 'Assessment Locked' : 'Assessment Completed!'}
               </CardTitle>
               <CardDescription className="text-lg text-gray-600">
-                Thank you for completing your assessment with Parikshan AI
+                {submissionState.isLocked 
+                  ? 'Your assessment has been submitted and is locked for evaluation'
+                  : 'Thank you for completing your assessment with Parikshan AI'
+                }
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center space-y-6">
@@ -324,6 +284,20 @@ const CandidateDashboard = () => {
                   )}
                 </div>
               </div>
+              
+              {submissionState.submissionCount > 0 && (
+                <Alert className="mb-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Submission #{submissionState.submissionCount} completed
+                    {submissionState.lastSubmittedAt && (
+                      <span className="block text-sm text-gray-500 mt-1">
+                        Last submitted: {new Date(submissionState.lastSubmittedAt).toLocaleString()}
+                      </span>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
               
               <div className="bg-gradient-to-r from-blue-100 to-blue-200 p-6 rounded-lg">
                 <CheckCircle className="h-12 w-12 text-primary mx-auto mb-4" />
@@ -376,9 +350,14 @@ const CandidateDashboard = () => {
                   <div className="text-sm text-gray-600">
                     {sections.filter(s => s.status === 'completed').length} of {sections.length} sections completed
                   </div>
-                  {isAllSectionsCompleted() && (
+                  {isAllSectionsCompleted() && submissionState.canSubmit && (
                     <Badge className="bg-green-100 text-green-700">
                       Ready for Final Submission
+                    </Badge>
+                  )}
+                  {!submissionState.canSubmit && submissionState.reason !== 'Loading...' && (
+                    <Badge className="bg-red-100 text-red-700">
+                      {submissionState.reason}
                     </Badge>
                   )}
                 </div>

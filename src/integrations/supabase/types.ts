@@ -68,42 +68,60 @@ export type Database = {
       }
       candidates: {
         Row: {
+          can_resubmit: boolean | null
           company_id: string
           created_at: string | null
           credentials_sent: boolean | null
+          download_url: string | null
           email: string
           full_name: string
           id: string
+          last_submitted_at: string | null
+          lock_reason: string | null
+          locked_by: string | null
           phone: string | null
           profile_data: Json | null
+          submission_count: number | null
           test_configuration: Json | null
           test_status: Database["public"]["Enums"]["test_status"] | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
+          can_resubmit?: boolean | null
           company_id: string
           created_at?: string | null
           credentials_sent?: boolean | null
+          download_url?: string | null
           email: string
           full_name: string
           id?: string
+          last_submitted_at?: string | null
+          lock_reason?: string | null
+          locked_by?: string | null
           phone?: string | null
           profile_data?: Json | null
+          submission_count?: number | null
           test_configuration?: Json | null
           test_status?: Database["public"]["Enums"]["test_status"] | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
+          can_resubmit?: boolean | null
           company_id?: string
           created_at?: string | null
           credentials_sent?: boolean | null
+          download_url?: string | null
           email?: string
           full_name?: string
           id?: string
+          last_submitted_at?: string | null
+          lock_reason?: string | null
+          locked_by?: string | null
           phone?: string | null
           profile_data?: Json | null
+          submission_count?: number | null
           test_configuration?: Json | null
           test_status?: Database["public"]["Enums"]["test_status"] | null
           updated_at?: string | null
@@ -577,6 +595,47 @@ export type Database = {
           },
         ]
       }
+      test_submission_logs: {
+        Row: {
+          candidate_id: string
+          created_at: string | null
+          id: string
+          submission_attempt: number
+          submission_metadata: Json | null
+          submitted_at: string
+          webhook_response: Json | null
+          webhook_status: string | null
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string | null
+          id?: string
+          submission_attempt: number
+          submission_metadata?: Json | null
+          submitted_at?: string
+          webhook_response?: Json | null
+          webhook_status?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string | null
+          id?: string
+          submission_attempt?: number
+          submission_metadata?: Json | null
+          submitted_at?: string
+          webhook_response?: Json | null
+          webhook_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_submission_logs_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -586,6 +645,15 @@ export type Database = {
         Args: { target_user_id: string; new_role: string }
         Returns: undefined
       }
+      check_submission_eligibility: {
+        Args: { candidate_uuid: string }
+        Returns: {
+          can_submit: boolean
+          reason: string
+          current_status: string
+          submission_count: number
+        }[]
+      }
       is_admin: {
         Args: { user_id?: string }
         Returns: boolean
@@ -593,6 +661,25 @@ export type Database = {
       promote_user_to_admin: {
         Args: { user_email: string }
         Returns: undefined
+      }
+      reset_candidate_assessment: {
+        Args: {
+          candidate_uuid: string
+          admin_user_id: string
+          reset_reason?: string
+        }
+        Returns: {
+          success: boolean
+          message: string
+        }[]
+      }
+      submit_assessment: {
+        Args: { candidate_uuid: string; submission_metadata?: Json }
+        Returns: {
+          success: boolean
+          message: string
+          submission_id: string
+        }[]
       }
     }
     Enums: {
